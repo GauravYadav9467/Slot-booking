@@ -8,12 +8,8 @@
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 
-    // shadcn.ui
-    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     },
 
     /* Bundler mode */

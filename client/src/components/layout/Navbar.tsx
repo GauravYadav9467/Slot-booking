@@ -1,8 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navbarVisible, setNavbarVisible] = useState(true);
+
+  useEffect(() => {
+    let previousScrollY = window.scrollY;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (currentScrollY < 80) {
+        setNavbarVisible(true);
+      } else if (currentScrollY > previousScrollY) {
+        setNavbarVisible(false);
+      } else if (currentScrollY < previousScrollY) {
+        setNavbarVisible(true);
+      }
+
+      previousScrollY = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const linkStyle = ({ isActive }: { isActive: boolean }) =>
     `transition-all duration-200 whitespace-nowrap ${
@@ -14,7 +36,11 @@ export default function Navbar() {
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <div>
+    <div
+      className={`sticky top-0 z-50 transition-transform duration-300 ${
+        navbarVisible ? "translate-y-0" : "-translate-y-full"
+      }`}
+    >
       <header className="bg-black text-[#ACBCBD] relative z-50">
         <nav className="min-h-[60px] px-4 md:px-6 flex items-center justify-between">
           {/* Brand Name */}
