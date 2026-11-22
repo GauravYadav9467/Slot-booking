@@ -94,7 +94,8 @@ const bookingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-bookingSchema.index({ stationId: 1, startAt: 1, endAt: 1, status: 1 });
+bookingSchema.index({ stationId: 1, status: 1, startAt: 1, endAt: 1 });
 bookingSchema.index({ userId: 1, startAt: -1 });
+bookingSchema.index({ status: 1, startAt: -1 });
 
 module.exports = mongoose.models.Booking || mongoose.model("Booking", bookingSchema);
