@@ -18,7 +18,7 @@ Station availability, session times, and booking records are difficult to coordi
 
 ## Scope
 
-The current implementation includes a React/Vite client prototype and a REST backend for health checks, authentication, station management, bookings, and wallet transactions. The client currently displays a static station and checkout concept; it is not connected to these APIs. Financial endpoints require MongoDB multi-document transactions on replica set `rs0`.
+The current implementation includes a React/Vite client integrated with REST APIs for authentication, station discovery, bookings, and wallet transactions. The home page keeps its established visual design, while new user/admin pages follow its color and component conventions. Financial endpoints require MongoDB multi-document transactions on replica set `rs0`.
 
 Wallet ledger operations are implemented as local simulations. Simulated top-ups do not integrate with a payment provider and do not claim real money was received. Notifications, tournaments, and payment-provider integration are outside the current scope.
 
@@ -36,7 +36,7 @@ Wallet ledger operations are implemented as local simulations. Simulated top-ups
 
 ### Current client
 
-The React client renders a NEXUS ARENA home page with a station-card and checkout layout. Its values are static; login, station browsing, and booking are not yet wired to the backend.
+The client provides registration, login, profile, station detail, booking checkout/history/details, wallet, transaction history, an admin dashboard, active station management, and admin booking views. It uses live backend data and includes loading, empty, success, and error feedback. Top-ups are clearly labeled simulations. The admin station view cannot rediscover inactive or maintenance stations because the backend listing endpoint exposes active stations only.
 
 ## User roles
 
@@ -67,7 +67,7 @@ Public registration always assigns the `user` role. There is no public admin-reg
 10. Administrators can make reasoned wallet adjustments, recorded as ledger entries.
 11. The system retains cancelled bookings and transaction records for history.
 
-Notifications and a connected client booking flow remain planned work.
+Notifications remain planned. Broader frontend automated tests and deployment work remain for Milestone 9.
 
 ## Non-functional requirements
 

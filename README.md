@@ -1,6 +1,6 @@
 # NEXUS ARENA — Gaming Lounge & Station Booking System
 
-NEXUS ARENA is an academic gaming lounge project for station discovery, user authentication, station reservations, and simulated wallet payments. The React client currently presents a static home-page prototype; the REST backend implements authentication, station management, bookings, and wallet APIs.
+NEXUS ARENA is an academic gaming lounge project for station discovery, user authentication, station reservations, and simulated wallet payments. The React client integrates with the REST backend for authentication, station discovery, bookings and wallets. The existing home page design is retained and the connected account pages follow its dark teal and cyan visual style.
 
 ## Implemented features
 
@@ -10,7 +10,7 @@ NEXUS ARENA is an academic gaming lounge project for station discovery, user aut
 - MongoDB-backed reservation leases to coordinate concurrent booking API requests.
 - Transaction-backed simulated wallet top-ups, booking charges, cancellation refunds, transaction history, and admin adjustments.
 
-Top-ups are a local simulation and do not charge a payment method or represent funds received. Wallet operations require MongoDB replica-set transactions. Notifications and frontend API integration remain planned. Eligible future booking cancellations refund successful wallet charges; unpaid cancellations do not issue refunds.
+Top-ups are a local simulation and do not charge a payment method or represent funds received. Wallet operations require MongoDB replica-set transactions. Notifications remain planned. Eligible future booking cancellations refund successful wallet charges; unpaid cancellations do not issue refunds. Admin station discovery currently uses the active-only public listing; the backend does not yet expose all statuses to admins.
 
 ## Technology stack
 

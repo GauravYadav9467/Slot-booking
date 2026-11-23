@@ -50,12 +50,26 @@ async function request(path, { method = "GET", body, token } = {}) {
   return { status: response.status, body: await response.json() };
 }
 
-function timeSlot(offsetHours = 48, duration = sessionMinutes) {
+function timeSlot(offsetHours = 30, duration = sessionMinutes) {
   const minuteMs = 60 * 1000;
   const startMs = Math.ceil((Date.now() + offsetHours * 60 * minuteMs) / minuteMs) * minuteMs;
   const startAt = new Date(startMs);
   const endAt = new Date(startMs + duration * minuteMs);
   return { startAt: startAt.toISOString(), endAt: endAt.toISOString() };
+}
+
+function dateAfterKolkataDays(days) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const date = new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day) + days));
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  const startAt = `${yyyy}-${mm}-${dd}T18:00:00+05:30`;
+  const endAt = new Date(Date.parse(startAt) + sessionMinutes * 60000).toISOString();
+  return { startAt, endAt };
 }
 
 function sameDaySlot() {
@@ -191,6 +205,13 @@ test("booking APIs enforce schedule, ownership, price, status and concurrency ru
     assert.equal((await request(`/api/v1/bookings/availability?stationId=not-an-id&startAt=${encodeURIComponent(future.startAt)}&endAt=${encodeURIComponent(future.endAt)}`)).status, 400);
   });
 
+  await t.test("booking dates are limited to today and the next two Kolkata calendar days", async () => {
+    const outsideWindow = dateAfterKolkataDays(3);
+    const query = new URLSearchParams({ stationId: activeStation.id, ...outsideWindow });
+    assert.equal((await request(`/api/v1/bookings/availability?${query}`)).status, 400);
+    assert.equal((await createRequest(activeStation.id, outsideWindow)).status, 400);
+  });
+
   let firstBooking;
   await t.test("booking creation uses the authenticated user and server-side paise price", async () => {
     assert.equal((await request("/api/v1/bookings", {
@@ -239,7 +260,7 @@ test("booking APIs enforce schedule, ownership, price, status and concurrency ru
   });
 
   await t.test("same-station simultaneous booking requests cannot both succeed", async () => {
-    const slot = timeSlot(96);
+    const slot = timeSlot(42);
     const results = await Promise.all([
       createRequest(concurrencyStation._id, slot, userToken),
       createRequest(concurrencyStation._id, slot, otherUserToken),
@@ -251,7 +272,7 @@ test("booking APIs enforce schedule, ownership, price, status and concurrency ru
   });
 
   await t.test("expired station leases are reclaimed after abandoned requests", async () => {
-    const slot = timeSlot(120);
+    const slot = timeSlot(43);
     const activeToken = `active-${fixtureKey}`;
     await StationReservationLock.create({
       stationId: recoveryStation._id,
@@ -346,7 +367,7 @@ test("booking APIs enforce schedule, ownership, price, status and concurrency ru
       body: { reason: "Not permitted" },
     })).status, 409);
 
-    const adminCancellable = await createRequest(activeStation._id, timeSlot(240), userToken);
+    const adminCancellable = await createRequest(activeStation._id, timeSlot(44), userToken);
     assert.equal(adminCancellable.status, 201);
     const adminCancelled = await request(`/api/v1/bookings/${adminCancellable.body.data.booking.id}/cancel`, {
       method: "PATCH",

@@ -69,7 +69,7 @@ Example create request:
 }
 ```
 
-Creation returns HTTP 201 with the station record. Public listing returns `{ "items": [...], "pagination": { "page", "limit", "total", "pages" } }` and only includes active stations.
+Creation returns HTTP 201 with the station record. Public listing returns `{ "stations": [...], "pagination": { "page", "limit", "total", "totalPages" } }` and only includes active stations.
 
 ## Implemented: bookings
 
@@ -90,6 +90,8 @@ GET /api/v1/bookings/availability?stationId=665f00000000000000000001&startAt=202
 ```
 
 The response includes `available`, `reason`, `durationMinutes`, `hourlyRateMinor`, `estimatedTotalMinor`, and `currency`. A non-active station returns `available: false`; a missing station returns 404.
+
+Booking start dates are limited to today and the next two calendar days in `Asia/Kolkata`. This restriction is checked by the backend for both availability and creation; the client date controls are only a convenience.
 
 Example available response:
 
@@ -125,7 +127,7 @@ The response is HTTP 201 with a booking containing `userId` from the verified JW
 }
 ```
 
-`GET /bookings/my` accepts `status`, `page`, and `limit`. `GET /bookings/admin` accepts `status`, `stationId`, `from`, `to`, `page`, and `limit`; `from` is inclusive and `to` is exclusive. Both lists sort by session start descending and return `{ "items": [...], "pagination": { "page", "limit", "total", "pages" } }`. Booking details are available to the owner or an admin; a non-owner receives 404.
+`GET /bookings/my` accepts `status`, `page`, and `limit`. `GET /bookings/admin` accepts `status`, `stationId`, `from`, `to`, `page`, and `limit`; `from` is inclusive and `to` is exclusive. Both lists sort by session start descending and return `{ "bookings": [...], "pagination": { "page", "limit", "total", "totalPages" } }`. Booking details are available to the owner or an admin; a non-owner receives 404.
 
 Cancellation accepts an optional reason:
 
@@ -199,6 +201,6 @@ Financial operations use MongoDB sessions and multi-document transactions on rep
 | 422 | Price exceeds supported integer limits |
 | 500 | Unexpected server error; internal database details are not returned |
 
-## Planned APIs
+## Client integration
 
-Notification APIs and frontend API integration are planned. Top-ups are simulated; real payment-provider integration is not implemented.
+The client uses the endpoints above for registration, login, profile, public stations, availability, booking creation/payment/history/cancellation, wallet history/top-ups, and admin booking/station changes. The admin station screen can only list active stations because `GET /stations` intentionally filters to active records; no all-status admin listing endpoint currently exists. Notification APIs and client notifications are not implemented. Top-ups are simulated; real payment-provider integration is not implemented.

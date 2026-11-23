@@ -2,7 +2,7 @@
 
 ## Components
 
-- **React client:** Vite, TypeScript, and Tailwind CSS render the current lounge home-page prototype. The client does not yet call the backend.
+- **React client:** Vite, TypeScript, and Tailwind CSS provide the branded home page and API-connected account, station, booking, wallet, and admin screens. The home page layout and styling remain the visual reference.
 - **Express API:** CommonJS modules mount versioned health, authentication, station, booking, and wallet routes. Helmet, CORS, JSON parsing, and centralized error handling are configured in the application.
 - **Middleware:** Authentication verifies JWTs and reloads the current user; role middleware protects admin routes; validators normalize and reject invalid inputs.
 - **Controllers and services:** Controllers map HTTP requests and responses. Services implement authentication, station, booking, and wallet rules. Wallet service operations coordinate financial writes through MongoDB sessions.
@@ -33,6 +33,8 @@ flowchart LR
 4. A controller calls a service and returns a status code with a JSON envelope.
 5. Services query or update Mongoose models. Financial services perform all wallet balance, ledger, and booking payment/refund updates inside a MongoDB session transaction. Errors are passed to centralized error handling.
 
+The client API layer reads `VITE_API_BASE_URL` and defaults to `http://localhost:5000/api/v1`. It sends bearer tokens for protected requests, normalizes API errors, and clears expired sessions on authentication failures. User and admin route guards rely on the loaded profile role; the backend remains authoritative for access control.
+
 ## Authentication flow
 
 Registration normalizes the email, hashes the password, creates a user with the `user` role, and creates the user's wallet. Login verifies the hash and returns an HS256 JWT with the configured expiry. Protected requests require a bearer token; middleware verifies it, loads the current user, rejects blocked accounts or changed roles, and sets the authenticated user ID and role for downstream handlers.
@@ -54,6 +56,7 @@ The simulated top-up does not contact a payment processor, and this academic wal
 ## Important technical decisions
 
 - Booking times require an explicit ISO 8601 offset and are stored as UTC `Date` values. Client display defaults to `Asia/Kolkata`.
+- Booking start dates are limited by the backend to today and the next two calendar days in `Asia/Kolkata`; the client date controls mirror this rule.
 - Reservation intervals are half-open: `[startAt, endAt)`. An end time equal to another booking's start time is allowed.
 - Session duration defaults to 30-minute increments, minimum 30 minutes, maximum 12 hours. These values are environment-configurable.
 - Prices are stored in integer paise. The server uses the station rate snapshot and rounds a fractional paise upward; no discounts are applied.

@@ -42,6 +42,24 @@ function parseIsoDate(value) {
   return Number.isFinite(timestamp) ? new Date(timestamp) : null;
 }
 
+function kolkataCalendarDay(date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return Math.floor(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)) / 86400000);
+}
+
+function validateBookingDateWindow(startAt, errors) {
+  const dayOffset = kolkataCalendarDay(startAt) - kolkataCalendarDay(new Date());
+  if (dayOffset < 0 || dayOffset > 2) {
+    errors.push("Bookings are limited to today and the next two calendar days in Asia/Kolkata.");
+  }
+}
+
 function durationRules() {
   const read = (key, fallback) => {
     const value = process.env[key];
@@ -79,6 +97,7 @@ function parseTimeWindow(startValue, endValue, errors) {
   if (!startAt || !endAt) return null;
 
   if (startAt.getTime() <= Date.now()) errors.push("startAt must be in the future.");
+  validateBookingDateWindow(startAt, errors);
   if (endAt <= startAt) errors.push("endAt must be later than startAt.");
 
   if (startAt.getTime() % 60000 !== 0 || endAt.getTime() % 60000 !== 0) {

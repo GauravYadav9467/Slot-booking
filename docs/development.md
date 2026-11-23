@@ -41,6 +41,10 @@ Put the generated value in the ignored `server/.env` file. Do not commit `.env`.
 | `WALLET_TOPUP_MIN_MINOR` | `100` | Minimum simulated top-up, in paise |
 | `WALLET_TOPUP_MAX_MINOR` | `1000000` | Maximum simulated top-up, in paise |
 
+## Configure the frontend
+
+The optional `client/.env` file can set `VITE_API_BASE_URL`. Copy `client/.env.example` to `client/.env` for local development; the default is `http://localhost:5000/api/v1`. The backend CORS configuration must permit the Vite development origin if it differs from the existing local setup. Frontend environment values are public build-time settings and must not contain credentials or secrets.
+
 Start MongoDB before starting the backend. The connection string may include credentials in a local `.env` when authentication is enabled; never put them in tracked files.
 
 ### Configure a local single-node replica set on Windows
@@ -82,7 +86,7 @@ cd client
 npm run dev
 ```
 
-The API listens at `http://localhost:5000` by default. The Vite development server prints its local URL. The current home page is a static prototype and does not yet call these APIs.
+The API listens at `http://localhost:5000` by default. The Vite development server prints its local URL. The client uses the backend for account, station, booking, and wallet flows. Notifications are not implemented.
 
 ## Local workflow and checks
 

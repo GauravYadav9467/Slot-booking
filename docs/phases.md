@@ -36,17 +36,19 @@
 
 **Deliverables:** Authenticated wallet and transaction history APIs, configurable simulated top-ups, booking payment, refunds for successfully paid future bookings cancelled before start, and admin adjustments with mandatory reasons. Every balance and ledger operation uses a MongoDB session transaction on replica set `rs0`; unique references and conditional balance updates provide idempotency and prevent duplicate processing or negative balances. Top-ups are not real payments.
 
-## Milestone 7: Notifications — PLANNED
+## Milestone 7: Frontend and backend integration — IN PROGRESS
+
+**Objective:** Connect the NEXUS ARENA client to the existing authenticated REST APIs while retaining the established home-page design.
+
+**Implemented:** Central API client, environment-based API URL, persistent login and protected routes, registration/login/profile/logout, live station search and type filtering, availability and server quotes, booking creation/payment/history/cancellation, wallet and simulated top-ups, transaction history, and admin booking and active station management screens. New pages use the home page's dark teal, cyan and charcoal visual system. Backend booking validation limits reservations to today and the next two Asia/Kolkata calendar days.
+
+**Remaining:** Add an admin station listing API that includes every status so maintenance/inactive stations can be rediscovered and reactivated. There is no notifications API or notification screen integration yet.
+
+## Milestone 8: Notifications — PLANNED
 
 **Objective:** Notify users of booking and account events.
 
 **Deliverables:** Notification creation for wallet and booking events, unread/read state, user notification APIs, and a client notification view.
-
-## Milestone 8: Frontend integration — PLANNED
-
-**Objective:** Replace static prototype values with authenticated API-backed screens.
-
-**Deliverables:** Registration/login, station filters, availability selection, booking flow/history, wallet and notification screens, loading/error states, and responsive behavior.
 
 ## Milestone 9: Testing and deployment — PLANNED
 
