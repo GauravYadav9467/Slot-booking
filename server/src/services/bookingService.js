@@ -1,8 +1,11 @@
 const { randomUUID } = require("node:crypto");
+const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
+const Notification = require("../models/Notification");
 const Station = require("../models/Station");
 const StationReservationLock = require("../models/StationReservationLock");
 const walletService = require("./walletService");
+const notificationService = require("./notificationService");
 
 const activeStatuses = ["pending", "confirmed"];
 const stationFields = "name code type status";
@@ -200,17 +203,41 @@ async function createBooking({ stationId, startAt, endAt, durationMinutes, userI
 
     await assertStationLock(stationId, token);
     const priceSnapshot = calculatePrice(station.hourlyRateMinor, durationMinutes);
-    const booking = await Booking.create({
-      userId,
-      stationId,
-      startAt,
-      endAt,
-      durationMinutes,
-      status: "pending",
-      priceSnapshot,
-      currency: "INR",
-    });
-    return safeBooking(booking);
+    await Promise.all([Booking.init(), Notification.init()]);
+    const session = await mongoose.startSession();
+    const bookingId = new mongoose.Types.ObjectId();
+    let result;
+    try {
+      await session.withTransaction(async () => {
+        const [booking] = await Booking.create([{
+          _id: bookingId,
+          userId,
+          stationId,
+          startAt,
+          endAt,
+          durationMinutes,
+          status: "pending",
+          priceSnapshot,
+          currency: "INR",
+        }], { session });
+        await notificationService.notifyAdmins({
+          eventKey: `booking-created:${bookingId}`,
+          type: "admin_booking_created",
+          title: "New station booking",
+          message: "A station booking was created and is awaiting payment.",
+          relatedBookingId: bookingId,
+          session,
+        });
+        result = safeBooking(booking);
+      }, {
+        readPreference: "primary",
+        readConcern: { level: "snapshot" },
+        writeConcern: { w: "majority" },
+      });
+      return result;
+    } finally {
+      await session.endSession();
+    }
   } finally {
     await releaseStationLock(stationId, token);
   }

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { createStation, deactivateStation, formatMinor, getAdminBookings, getAdminStations, getErrorMessage, getStations, updateStation, updateStationStatus, type Booking, type Pagination, type Station } from "../lib/api";
+import { createStation, deactivateStation, formatMinor, getAdminBookings, getAdminOverview, getAdminStations, getErrorMessage, updateStation, updateStationStatus, type AdminOverview, type Booking, type Pagination, type Station } from "../lib/api";
 import { buttonPrimary, buttonSecondary, inputClass, LoadingState, Notice, PageHeading } from "../components/ui/Feedback";
 import { formatKolkataDateTime } from "../lib/bookingTime";
 
@@ -11,16 +11,14 @@ function AdminContent({ children }: { children: ReactNode }) {
 
 export function AdminDashboardPage() {
   const { token } = useAuth();
-  const [stationTotal, setStationTotal] = useState<number | null>(null);
-  const [bookingTotal, setBookingTotal] = useState<number | null>(null);
-  const [recent, setRecent] = useState<Booking[]>([]);
+  const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     if (!token) return;
     let active = true;
-    Promise.all([getStations({ page: 1, limit: 1 }), getAdminBookings(token, { page: 1, limit: 5 })])
-      .then(([stationResult, bookingResult]) => { if (active) { setStationTotal(stationResult.pagination.total); setBookingTotal(bookingResult.pagination.total); setRecent(bookingResult.bookings); } })
+    getAdminOverview(token)
+      .then(({ overview: result }) => { if (active) setOverview(result); })
       .catch((e) => { if (active) setError(getErrorMessage(e)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -28,9 +26,11 @@ export function AdminDashboardPage() {
   return <AdminContent>
     <PageHeading eyebrow="LOUNGE OPERATIONS" title="Admin dashboard" description="Manage the current station inventory and review upcoming booking activity." />
     {error && <div className="mb-5"><Notice>{error}</Notice></div>}
-    {loading ? <LoadingState label="Loading operations overview…" /> : <>
-      <div className="grid gap-4 sm:grid-cols-2"><div className="rounded-2xl border border-[#164B54] bg-gradient-to-br from-[#172A30] to-[#171A22] p-6"><p className="text-xs font-bold tracking-widest text-[#4DDCE9]">ACTIVE STATIONS</p><p className="mt-3 text-4xl font-extrabold text-white">{stationTotal ?? "—"}</p><Link to="/admin/stations" className="mt-4 inline-block text-sm font-semibold text-[#4DDCE9] hover:underline">Manage stations →</Link></div><div className="rounded-2xl border border-[#164B54] bg-gradient-to-br from-[#172A30] to-[#171A22] p-6"><p className="text-xs font-bold tracking-widest text-[#4DDCE9]">BOOKINGS ON RECORD</p><p className="mt-3 text-4xl font-extrabold text-white">{bookingTotal ?? "—"}</p><Link to="/admin/bookings" className="mt-4 inline-block text-sm font-semibold text-[#4DDCE9] hover:underline">Review bookings →</Link></div></div>
-      <section className="mt-9"><h2 className="mb-4 text-xl font-bold text-white">Recent sessions</h2>{recent.length ? <div className="overflow-x-auto rounded-2xl border border-[#164B54]"><table className="w-full min-w-[700px] border-collapse text-left text-sm"><thead className="bg-[#0D1218] text-xs uppercase tracking-wide text-[#84919D]"><tr><th className="p-4">Customer</th><th className="p-4">Station</th><th className="p-4">Session</th><th className="p-4">Status</th><th className="p-4" /></tr></thead><tbody className="divide-y divide-[#263640] bg-[#151A20]">{recent.map((booking) => <tr key={booking.id}><td className="p-4 text-white">{booking.user?.name || "Customer"}</td><td className="p-4 text-[#C5D0D8]">{booking.station?.name || "Station"}</td><td className="p-4 text-[#C5D0D8]">{formatKolkataDateTime(booking.startAt)}</td><td className="p-4 capitalize text-[#4DDCE9]">{booking.status} · {booking.paymentStatus}</td><td className="p-4"><Link to={`/bookings/${booking.id}`} className="text-xs font-semibold text-[#4DDCE9] hover:underline">Details</Link></td></tr>)}</tbody></table></div> : <div className="rounded-xl border border-[#263640] bg-[#0D1218] p-5 text-sm text-[#84919D]">No bookings are on record yet.</div>}</section>
+    {loading ? <LoadingState label="Loading operations overview…" /> : overview && <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{([ ["ACTIVE STATIONS", overview.stations.active], ["MAINTENANCE", overview.stations.maintenance], ["INACTIVE", overview.stations.inactive] ] as const).map(([label, count]) => <div key={label} className="rounded-2xl border border-[#164B54] bg-gradient-to-br from-[#172A30] to-[#171A22] p-6"><p className="text-xs font-bold tracking-widest text-[#4DDCE9]">{label}</p><p className="mt-3 text-4xl font-extrabold text-white">{count}</p><Link to="/admin/stations" className="mt-4 inline-block text-sm font-semibold text-[#4DDCE9] hover:underline">Manage stations →</Link></div>)}</div>
+      <section className="mt-8 rounded-2xl border border-[#164B54] bg-[#151A20] p-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold text-white">Booking status overview</h2><Link to="/admin/bookings" className="text-sm font-semibold text-[#4DDCE9] hover:underline">Manage bookings →</Link></div><div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">{([ ["All bookings", overview.bookings.total], ["Pending", overview.bookings.pending], ["Confirmed", overview.bookings.confirmed], ["Cancelled", overview.bookings.cancelled], ["Completed", overview.bookings.completed], ["No show", overview.bookings.no_show] ] as const).map(([label, count]) => <div key={label} className="rounded-xl border border-[#263640] bg-[#0D1218] p-4"><p className="text-xs text-[#84919D]">{label}</p><p className="mt-2 text-2xl font-bold text-white">{count}</p></div>)}</div></section>
+      <section className="mt-9"><h2 className="mb-4 text-xl font-bold text-white">Recent bookings</h2>{overview.recentBookings.length ? <div className="overflow-x-auto rounded-2xl border border-[#164B54]"><table className="w-full min-w-[700px] border-collapse text-left text-sm"><thead className="bg-[#0D1218] text-xs uppercase tracking-wide text-[#84919D]"><tr><th className="p-4">Customer</th><th className="p-4">Station</th><th className="p-4">Session</th><th className="p-4">Status</th><th className="p-4" /></tr></thead><tbody className="divide-y divide-[#263640] bg-[#151A20]">{overview.recentBookings.map((booking) => <tr key={booking.id}><td className="p-4 text-white">{booking.user}</td><td className="p-4 text-[#C5D0D8]">{booking.station}</td><td className="p-4 text-[#C5D0D8]">{formatKolkataDateTime(booking.startAt)}</td><td className="p-4 capitalize text-[#4DDCE9]">{booking.status} · {booking.paymentStatus}</td><td className="p-4"><Link to={`/bookings/${booking.id}`} className="text-xs font-semibold text-[#4DDCE9] hover:underline">Details</Link></td></tr>)}</tbody></table></div> : <div className="rounded-xl border border-[#263640] bg-[#0D1218] p-5 text-sm text-[#84919D]">No bookings are on record yet.</div>}</section>
+      <section className="mt-9"><div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-xl font-bold text-white">Recent operational notifications</h2><Link to="/notifications" className="text-sm font-semibold text-[#4DDCE9] hover:underline">Notification history</Link></div>{overview.recentNotifications.length ? <div className="divide-y divide-[#263640] overflow-hidden rounded-xl border border-[#263640] bg-[#0D1218]">{overview.recentNotifications.map((notification) => <div key={notification.id} className="p-4"><p className="text-sm font-bold text-white">{notification.title}</p><p className="mt-1 text-sm text-[#A5B4BC]">{notification.message}</p><p className="mt-1 text-xs text-[#84919D]">{new Date(notification.createdAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</p></div>)}</div> : <div className="rounded-xl border border-[#263640] bg-[#0D1218] p-5 text-sm text-[#84919D]">No operational notifications have been recorded.</div>}</section>
     </>}
   </AdminContent>;
 }

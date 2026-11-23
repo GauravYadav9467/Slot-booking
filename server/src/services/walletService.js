@@ -1,9 +1,11 @@
 const { createHash } = require("node:crypto");
 const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
+const Notification = require("../models/Notification");
 const Transaction = require("../models/Transaction");
 const User = require("../models/User");
 const Wallet = require("../models/Wallet");
+const notifications = require("./notificationService");
 
 const MAX_MINOR = Number.MAX_SAFE_INTEGER;
 
@@ -29,7 +31,7 @@ function topUpLimits() {
 }
 
 async function inFinancialTransaction(work) {
-  await Promise.all([Wallet.init(), Transaction.init(), Booking.init()]);
+  await Promise.all([Wallet.init(), Transaction.init(), Booking.init(), Notification.init()]);
   const session = await mongoose.startSession();
   let result;
   try {
@@ -178,6 +180,15 @@ async function topUp(userId, amountMinor, idempotencyKey) {
       reference,
       description: "Simulated wallet top-up",
     }, session);
+    await notifications.createForUser({
+      userId,
+      eventKey: `wallet-top-up:${transaction._id}`,
+      type: "wallet_top_up",
+      title: "Wallet top-up recorded",
+      message: "Your simulated wallet top-up was recorded successfully.",
+      relatedTransactionId: transaction._id,
+      session,
+    });
     return { transaction: safeTransaction(transaction), wallet: safeWallet(updatedWallet), idempotent: false };
   });
 
@@ -230,6 +241,15 @@ async function payBooking(bookingId, userId) {
         { session, returnDocument: "after", runValidators: true }
       );
       if (!freeBooking) throw createError("Booking is no longer eligible for confirmation.", 409);
+      await notifications.createForUser({
+        userId,
+        eventKey: `booking-confirmed:${booking._id}`,
+        type: "booking_confirmed",
+        title: "Booking confirmed",
+        message: "Your gaming session is confirmed.",
+        relatedBookingId: booking._id,
+        session,
+      });
       return { booking: safeBooking(freeBooking), transaction: null, wallet: null, idempotent: false };
     }
 
@@ -260,6 +280,34 @@ async function payBooking(bookingId, userId) {
       { session, returnDocument: "after", runValidators: true }
     );
     if (!updatedBooking) throw createError("Booking is no longer eligible for payment.", 409);
+    await notifications.createForUser({
+      userId,
+      eventKey: `booking-confirmed:${booking._id}`,
+      type: "booking_confirmed",
+      title: "Booking confirmed",
+      message: "Your gaming session is confirmed and paid from your wallet.",
+      relatedBookingId: booking._id,
+      session,
+    });
+    await notifications.createForUser({
+      userId,
+      eventKey: `booking-payment:${transaction._id}`,
+      type: "payment_success",
+      title: "Booking payment successful",
+      message: "Wallet payment for your gaming session was completed.",
+      relatedBookingId: booking._id,
+      relatedTransactionId: transaction._id,
+      session,
+    });
+    await notifications.notifyAdmins({
+      eventKey: `booking-paid:${booking._id}`,
+      type: "admin_booking_paid",
+      title: "Booking payment completed",
+      message: "A customer completed wallet payment for a station booking.",
+      relatedBookingId: booking._id,
+      relatedTransactionId: transaction._id,
+      session,
+    });
     return { booking: safeBooking(updatedBooking), transaction: safeTransaction(transaction), wallet: safeWallet(updatedWallet), idempotent: false };
   });
 }
@@ -325,6 +373,36 @@ async function cancelBooking(bookingId, viewer, reason) {
       { session, returnDocument: "after", runValidators: true }
     );
     if (!updatedBooking) throw createError("This booking is no longer eligible for cancellation.", 409);
+    await notifications.createForUser({
+      userId: booking.userId,
+      eventKey: `booking-cancelled-user:${booking._id}`,
+      type: "booking_cancelled",
+      title: "Booking cancelled",
+      message: "Your station booking has been cancelled.",
+      relatedBookingId: booking._id,
+      session,
+    });
+    await notifications.notifyAdmins({
+      eventKey: `booking-cancelled-admin:${booking._id}`,
+      type: "admin_booking_cancelled",
+      title: "Booking cancelled",
+      message: "A station booking was cancelled.",
+      relatedBookingId: booking._id,
+      relatedTransactionId: refundTransaction?._id,
+      session,
+    });
+    if (refundTransaction) {
+      await notifications.createForUser({
+        userId: booking.userId,
+        eventKey: `booking-refund:${refundTransaction._id}`,
+        type: "booking_refund",
+        title: "Booking refund completed",
+        message: "Your eligible booking refund was returned to your wallet.",
+        relatedBookingId: booking._id,
+        relatedTransactionId: refundTransaction._id,
+        session,
+      });
+    }
     return {
       booking: safeBooking(updatedBooking),
       ...(refundTransaction ? { refund: safeTransaction(refundTransaction), wallet: safeWallet(updatedWallet) } : {}),

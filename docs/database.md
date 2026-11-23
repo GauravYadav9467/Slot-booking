@@ -90,12 +90,13 @@ Indexes: unique `reference` for idempotency; `{ userId, createdAt }` for transac
 | `relatedBookingId` | ObjectId → Booking | Optional |
 | `relatedTransactionId` | ObjectId → Transaction | Optional |
 | `readAt` | Date | Optional; unset means unread |
+| `eventRef` | String | Required for new records; unique per recipient to prevent duplicate event delivery |
 
-Indexes support per-user chronological and read-state queries.
+Indexes support per-user chronological and read-state queries. A sparse unique index on `eventRef` allows legacy documents without this field while preventing duplicate newly generated events.
 
 ## StationReservationLock (supporting model)
 
-This seventh, internal model serializes concurrent booking API writes per station. It is separate from financial transaction handling, which uses MongoDB replica-set transactions.
+This seventh, internal model serializes concurrent booking API writes per station. Booking creation now also uses a replica-set transaction to commit the booking and its administrator notification together. Financial transactions separately protect wallet, ledger, booking payment/refund, and related notification writes.
 
 | Field | Type | Rules |
 |---|---|---|
@@ -107,4 +108,4 @@ The unique `stationId` index makes acquisition atomic. A holder releases only it
 
 ## Financial integrity
 
-All balance changes, transaction inserts, and booking payment/refund state changes run in one MongoDB session transaction on replica set `rs0`. The wallet update uses a conditional balance predicate to prevent negative balances and integer overflow. If the ledger insert or booking update fails, the transaction aborts. Unique transaction references and booking `paymentStatus` prevent duplicate charges and refunds. No financial fallback is performed when transactions are unavailable.
+All balance changes, transaction inserts, booking payment/refund state changes, and their notifications run in one MongoDB session transaction on replica set `rs0`. The wallet update uses a conditional balance predicate to prevent negative balances and integer overflow. If a ledger or notification insert or booking update fails, the transaction aborts. Unique transaction references and booking `paymentStatus` prevent duplicate charges and refunds. No non-transactional financial fallback is performed when transactions are unavailable.

@@ -2,10 +2,10 @@
 
 ## Components
 
-- **React client:** Vite, TypeScript, and Tailwind CSS provide the branded home page and API-connected account, station, booking, wallet, and admin screens. The home page layout and styling remain the visual reference.
-- **Express API:** CommonJS modules mount versioned health, authentication, station, booking, and wallet routes. Helmet, CORS, JSON parsing, and centralized error handling are configured in the application.
+- **React client:** Vite, TypeScript, and Tailwind CSS provide the branded home page and API-connected account, station, booking, wallet, notification, and admin screens. The home page layout and styling remain the visual reference.
+- **Express API:** CommonJS modules mount versioned health, authentication, station, booking, wallet, notification, and admin routes. Helmet, CORS, JSON parsing, and centralized error handling are configured in the application.
 - **Middleware:** Authentication verifies JWTs and reloads the current user; role middleware protects admin routes; validators normalize and reject invalid inputs.
-- **Controllers and services:** Controllers map HTTP requests and responses. Services implement authentication, station, booking, and wallet rules. Wallet service operations coordinate financial writes through MongoDB sessions.
+- **Controllers and services:** Controllers map HTTP requests and responses. Services implement authentication, station, booking, wallet, notification, and admin overview rules. Wallet and booking services coordinate financial and notification writes through MongoDB sessions.
 - **Mongoose and MongoDB:** Models store users, stations, bookings, wallets, transactions, notifications, and the supporting station reservation lease.
 
 ```mermaid
@@ -31,7 +31,7 @@ flowchart LR
 2. A route applies authentication and, where required, admin authorization.
 3. Validators check IDs, fields, timestamps, filters, and pagination.
 4. A controller calls a service and returns a status code with a JSON envelope.
-5. Services query or update Mongoose models. Financial services perform all wallet balance, ledger, and booking payment/refund updates inside a MongoDB session transaction. Errors are passed to centralized error handling.
+5. Services query or update Mongoose models. Wallet balance, ledger, booking payment/refund state and related notifications commit inside one MongoDB session transaction. Booking creation and its admin notification also commit together. Errors are passed to centralized error handling.
 
 The client API layer reads `VITE_API_BASE_URL` and defaults to `http://localhost:5000/api/v1`. It sends bearer tokens for protected requests, normalizes API errors, and clears expired sessions on authentication failures. User and admin route guards rely on the loaded profile role; the backend remains authoritative for access control.
 
@@ -47,11 +47,17 @@ Booking creation acquires a MongoDB-backed lease with one unique lock record per
 
 If a process exits unexpectedly, the lease becomes reclaimable after `BOOKING_LOCK_TTL_MS`. An expired record is replaced on the next reservation attempt. Availability reports a live lease as `reservation_in_progress`. Integration tests issue concurrent requests against local MongoDB and verify that only one overlapping request succeeds.
 
-Direct database writes bypass application-level booking leases and ledger policy. Wallet changes require a MongoDB replica set named `rs0`. Top-ups, booking charges, eligible cancellation refunds, and admin adjustments use `withTransaction` with snapshot reads and majority writes. A balance update, its unique-reference transaction record, and (for bookings) payment/refund state commit or roll back together. Conditional balance updates protect against negative balances and safe-integer overflow; unique transaction references make operations idempotent. The MongoDB driver retries transient transaction errors. There is no non-transactional fallback.
+Direct database writes bypass application-level booking leases and ledger policy. Booking creation and wallet changes require a MongoDB replica set named `rs0`. Top-ups, booking charges, eligible cancellation refunds, admin adjustments, and booking creation use `withTransaction` with snapshot reads and majority writes. A balance update, its unique-reference transaction record, and (for bookings) booking/payment/refund state and notifications commit or roll back together. Conditional balance updates protect against negative balances and safe-integer overflow; unique transaction references make operations idempotent. The MongoDB driver retries transient transaction errors. There is no non-transactional fallback.
 
 Top-ups and admin adjustments require an `Idempotency-Key`; keys are hashed into unique transaction references and reused keys must match the original operation. Booking charges and refunds use deterministic references derived from the booking ID. Concurrent transactions against one wallet conflict and retry against the committed balance, so competing charges cannot both spend the same funds.
 
 The simulated top-up does not contact a payment processor, and this academic wallet is not a real-money payment system.
+
+## Notifications and administration
+
+Notification routes require authentication and derive the recipient from the verified account. The service scopes every list, read and unread-count operation to that user. A unique event reference per recipient makes event writes idempotent. Booking-created admin notifications share a transaction with the booking insert; wallet, payment, cancellation and refund notifications share the financial transaction that changes their ledger and booking state. Notification persistence failures therefore roll back the associated operation rather than leaving an unannounced financial change.
+
+The admin overview uses database aggregations for station and booking status counts and returns recent bookings plus the current administrator's operational notifications. The navbar refreshes unread counts on route changes, window focus, panel open, and explicit refresh events after account actions. No polling or external notification delivery is used.
 
 ## Important technical decisions
 

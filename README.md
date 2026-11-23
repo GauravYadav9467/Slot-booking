@@ -9,8 +9,9 @@ NEXUS ARENA is an academic gaming lounge project for station discovery, user aut
 - Availability checks, future bookings, server-calculated integer-paise pricing, booking history, cancellation, and admin booking views.
 - MongoDB-backed reservation leases to coordinate concurrent booking API requests.
 - Transaction-backed simulated wallet top-ups, booking charges, cancellation refunds, transaction history, and admin adjustments.
+- User-scoped in-app notifications for booking and wallet events, plus an operational admin dashboard.
 
-Top-ups are a local simulation and do not charge a payment method or represent funds received. Wallet operations require MongoDB replica-set transactions. Notifications remain planned. Eligible future booking cancellations refund successful wallet charges; unpaid cancellations do not issue refunds. Admins can list and manage stations across active, maintenance, and inactive statuses; public station discovery remains active-only.
+Top-ups are a local simulation and do not charge a payment method or represent funds received. Booking creation and wallet/booking financial updates use MongoDB replica-set transactions so their notifications stay atomic with the related records. Notifications are in-app only; email, SMS, WhatsApp and payment-provider delivery are not implemented. Eligible future booking cancellations refund successful wallet charges; unpaid cancellations do not issue refunds. Admins can list and manage stations across active, maintenance, and inactive statuses; public station discovery remains active-only.
 
 ## Technology stack
 
@@ -46,7 +47,7 @@ cd ..\client
 npm ci
 ```
 
-Configure `server/.env` using [the environment guide](docs/development.md). The backend financial APIs require a local MongoDB replica set named `rs0`; configure and verify it before starting the backend or running tests. Then run the API and client in separate terminals:
+Configure `server/.env` using [the environment guide](docs/development.md). Booking creation and financial APIs require a local MongoDB replica set named `rs0`; configure and verify it before starting the backend or running tests. Then run the API and client in separate terminals:
 
 ```powershell
 cd server

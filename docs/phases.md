@@ -44,11 +44,13 @@
 
 Notifications are tracked separately in Milestone 8.
 
-## Milestone 8: Notifications — PLANNED
+## Milestone 8: In-app notifications and operational improvements — COMPLETED
 
-**Objective:** Notify users of booking and account events.
+**Objective:** Provide private in-app booking and wallet notifications and show administrators current operational activity.
 
-**Deliverables:** Notification creation for wallet and booking events, unread/read state, user notification APIs, and a client notification view.
+**Implemented:** Authenticated, user-scoped notification listing, unread count, mark-one-read and mark-all-read APIs; unread/read filters and pagination; unique per-recipient event references; in-app notifications for booking creation, confirmation, payment, cancellation, wallet top-up and refund; a responsive navbar bell and history page; and an admin overview for station totals, booking status counts, recent bookings and operational notifications. Booking creation notifications and financial notifications are saved atomically with their related booking or wallet transaction. Notification writes are included in financial transactions so a failure rolls the complete operation back.
+
+**Limitations:** Notifications are in-app only and are not pushed in real time; the client refreshes counts on navigation, focus, panel open and successful account actions. External messaging channels are not integrated.
 
 ## Milestone 9: Testing and deployment — PLANNED
 

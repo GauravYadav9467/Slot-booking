@@ -18,9 +18,9 @@ Station availability, session times, and booking records are difficult to coordi
 
 ## Scope
 
-The current implementation includes a React/Vite client integrated with REST APIs for authentication, station discovery, bookings, and wallet transactions. The home page keeps its established visual design, while new user/admin pages follow its color and component conventions. Financial endpoints require MongoDB multi-document transactions on replica set `rs0`.
+The current implementation includes a React/Vite client integrated with REST APIs for authentication, station discovery, bookings, wallet transactions, and in-app notifications. The home page keeps its established visual design, while new user/admin pages follow its color and component conventions. Financial endpoints require MongoDB multi-document transactions on replica set `rs0`.
 
-Wallet ledger operations are implemented as local simulations. Simulated top-ups do not integrate with a payment provider and do not claim real money was received. Notifications, tournaments, and payment-provider integration are outside the current scope.
+Wallet ledger operations are implemented as local simulations. Simulated top-ups do not integrate with a payment provider and do not claim real money was received. Notifications are delivered inside the application only; email, SMS and WhatsApp delivery are not implemented. Tournaments and real payment-provider integration are outside the current scope.
 
 ## Main features
 
@@ -33,10 +33,11 @@ Wallet ledger operations are implemented as local simulations. Simulated top-ups
 - Per-station expiring reservation leases to serialize concurrent booking API writes.
 - Session-backed simulated wallet top-ups, booking payment deductions, eligible cancellation refunds, and administrator adjustments.
 - Idempotency references and transaction-backed balance changes to prevent duplicate credits, charges, and refunds.
+- User-scoped notification history and unread state for booking, payment, top-up and refund events; booking and financial notifications commit atomically with their associated operations.
 
 ### Current client
 
-The client provides registration, login, profile, station detail, booking checkout/history/details, wallet, transaction history, an admin dashboard, all-status station management, and admin booking views. It uses live backend data and includes loading, empty, success, and error feedback. Top-ups are clearly labeled simulations. Admin station listing includes active, maintenance, and inactive records, while public discovery remains limited to active stations.
+The client provides registration, login, profile, station detail, booking checkout/history/details, wallet, transaction history, notification history and a navbar notification panel, an admin dashboard, all-status station management, and admin booking views. It uses live backend data and includes loading, empty, success, and error feedback. Top-ups are clearly labeled simulations. Admin station listing includes active, maintenance, and inactive records, while public discovery remains limited to active stations.
 
 ## User roles
 
@@ -66,8 +67,9 @@ Public registration always assigns the `user` role. There is no public admin-reg
 9. Successfully paid future bookings are refunded when cancelled before start; unpaid cancellations do not create refunds.
 10. Administrators can make reasoned wallet adjustments, recorded as ledger entries.
 11. The system retains cancelled bookings and transaction records for history.
+12. Users can review, filter, and mark their in-app notifications as read; administrators can review booking operations.
 
-Notifications remain planned. Broader frontend automated tests and deployment work remain for Milestone 9.
+Broader frontend automated tests and deployment work remain for Milestone 9.
 
 ## Non-functional requirements
 

@@ -7,6 +7,7 @@ const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const app = require("../src/app");
 const Booking = require("../src/models/Booking");
+const Notification = require("../src/models/Notification");
 const Station = require("../src/models/Station");
 const StationReservationLock = require("../src/models/StationReservationLock");
 const User = require("../src/models/User");
@@ -129,6 +130,7 @@ test("booking APIs enforce schedule, ownership, price, status and concurrency ru
   await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
   await Promise.all([
     Booking.init(),
+    Notification.init(),
     Station.init(),
     StationReservationLock.init(),
     User.init(),
@@ -242,6 +244,7 @@ test("booking APIs enforce schedule, ownership, price, status and concurrency ru
     assert.equal(firstBooking.priceSnapshot.totalMinor, Math.ceil(85001 * sessionMinutes / 60));
     assert.equal(firstBooking.startAt, new Date(future.startAt).toISOString());
     assert.equal("passwordHash" in firstBooking, false);
+    assert.ok(await Notification.exists({ relatedBookingId: firstBooking.id, type: "admin_booking_created", userId: adminUser._id }));
   });
 
   await t.test("overlap is rejected while adjacent half-open intervals are accepted", async () => {
@@ -406,6 +409,8 @@ after(async () => {
       });
     }
     if (fixtureStationIds.length) {
+      const relatedBookingIds = await Booking.find({ stationId: { $in: fixtureStationIds } }).distinct("_id");
+      await Notification.deleteMany({ relatedBookingId: { $in: relatedBookingIds } });
       await StationReservationLock.deleteMany({ stationId: { $in: fixtureStationIds } });
       await Station.deleteMany({ _id: { $in: fixtureStationIds } });
     }

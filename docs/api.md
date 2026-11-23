@@ -117,7 +117,7 @@ Booking creation accepts only station and time fields; user ID, status, and pric
 }
 ```
 
-The response is HTTP 201 with a booking containing `userId` from the verified JWT, UTC ISO timestamps, `pending` status, and a paise `priceSnapshot`. For a one-hour session at 12,000 paise per hour, the price snapshot is:
+The response is HTTP 201 with a booking containing `userId` from the verified JWT, UTC ISO timestamps, `pending` status, and a paise `priceSnapshot`. Booking creation and its administrator notification commit in a MongoDB transaction and require replica set `rs0`. For a one-hour session at 12,000 paise per hour, the price snapshot is:
 
 ```json
 {
@@ -190,6 +190,26 @@ The request also requires an `Idempotency-Key`. Adjustments are recorded as `adj
 
 Financial operations use MongoDB sessions and multi-document transactions on replica set `rs0`. Unique transaction references make top-ups, adjustments, booking charges, and refunds idempotent. Conditional balance updates prevent negative balances. Balance changes, ledger records, and booking payment/refund state commit or roll back together. There is no standalone-server fallback.
 
+## Implemented: notifications
+
+| Method | Endpoint | Authentication | Role |
+|---|---|---|---|
+| GET | `/notifications` | Bearer token | Current user's notifications |
+| GET | `/notifications/unread-count` | Bearer token | Current user's unread count |
+| PATCH | `/notifications/:id/read` | Bearer token | Current user; own notification only |
+| PATCH | `/notifications/read-all` | Bearer token | Current user's unread notifications |
+| GET | `/admin/overview` | Bearer token | Admin operational dashboard |
+
+`GET /notifications` accepts `page`, `limit` (maximum 100), and `status=unread` or `status=read`. Results are newest first and return `{ "notifications": [...], "pagination": { "page", "limit", "total", "totalPages" } }`. A notification includes its ID, type, title, message, optional related booking/transaction IDs, `readAt` (null while unread), and `createdAt`. Event references and recipient IDs are not exposed. Access is always scoped to the authenticated account; an unknown or another user's notification ID returns 404.
+
+Admins may add `scope=operations` to the list endpoint for their own admin operations messages. Normal users receive 403 for this scope. The unread count is returned as `{ "unreadCount": number }`; marking one record read returns `{ "notification": ... }`, and mark-all returns `{ "markedRead": number }`. Repeating a read request is safe.
+
+Generated user types include `booking_confirmed`, `payment_success`, `booking_cancelled`, `booking_refund`, and `wallet_top_up`; administrator types are `admin_booking_created`, `admin_booking_paid`, and `admin_booking_cancelled`. Notifications are in-app only; no email, SMS, WhatsApp, or real-time push delivery is configured.
+
+Booking creation and its admin notification share a MongoDB transaction. Top-up, payment, cancellation and refund notifications are inserted inside the same financial transaction as the associated wallet/booking changes. If notification persistence fails, that transaction rolls back; the API does not silently accept an unnotified financial operation. Unique per-recipient event references prevent duplicate notification records when an idempotent financial operation is retried.
+
+`GET /admin/overview` returns database-derived counts for active, maintenance and inactive stations; booking totals by status; five most recently created bookings; and up to five recent operational notifications for the current admin account.
+
 ## Error responses
 
 | HTTP status | Meaning |
@@ -204,4 +224,4 @@ Financial operations use MongoDB sessions and multi-document transactions on rep
 
 ## Client integration
 
-The client uses the endpoints above for registration, login, profile, public stations, availability, booking creation/payment/history/cancellation, wallet history/top-ups, and admin booking/station changes. Admin station management uses `GET /stations/admin` to rediscover records at every status. Notification APIs and client notifications are not implemented. Top-ups are simulated; real payment-provider integration is not implemented.
+The client uses the endpoints above for registration, login, profile, public stations, availability, booking creation/payment/history/cancellation, wallet history/top-ups, notification history/read actions, and admin booking/station changes. Admin station management uses `GET /stations/admin` to rediscover records at every status. Top-ups are simulated; real payment-provider integration is not implemented.

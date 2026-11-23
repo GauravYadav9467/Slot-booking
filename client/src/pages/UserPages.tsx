@@ -183,7 +183,7 @@ export function BookingDetailPage() {
   async function pay() {
     if (!token || !booking) return;
     setBusy(true); setError(""); setNotice("");
-    try { const result = await payBooking(token, booking.id); setBooking(result.booking); setNotice("Wallet payment completed. Your session is confirmed."); setNoticeKind("success"); window.dispatchEvent(new Event("nexus-wallet-updated")); }
+    try { const result = await payBooking(token, booking.id); setBooking(result.booking); setNotice("Wallet payment completed. Your session is confirmed."); setNoticeKind("success"); window.dispatchEvent(new Event("nexus-wallet-updated")); window.dispatchEvent(new Event("nexus-notifications-refresh")); }
     catch (requestError) { setError(getErrorMessage(requestError)); }
     finally { setBusy(false); }
   }
@@ -197,6 +197,7 @@ export function BookingDetailPage() {
       setNoticeKind("success");
       setConfirmCancel(false);
       window.dispatchEvent(new Event("nexus-wallet-updated"));
+      window.dispatchEvent(new Event("nexus-notifications-refresh"));
     } catch (requestError) { setError(getErrorMessage(requestError)); }
     finally { setBusy(false); }
   }
@@ -296,6 +297,7 @@ export function WalletPage() {
       setAmountRupees("");
       setNotice("Simulated top-up recorded. No payment method was charged.");
       window.dispatchEvent(new Event("nexus-wallet-updated"));
+      window.dispatchEvent(new Event("nexus-notifications-refresh"));
     } catch (requestError) { setError(getErrorMessage(requestError)); }
     finally { setBusy(false); }
   }

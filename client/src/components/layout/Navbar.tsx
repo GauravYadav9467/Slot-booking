@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { formatMinor, getWallet } from "../../lib/api";
+import NotificationBell from "./NotificationBell";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -66,6 +67,7 @@ export default function Navbar() {
           <div className="hidden items-center gap-6 lg:flex xl:gap-10">
             <div className="flex items-center gap-6 xl:gap-10">{navLinks}</div>
             <div className="flex items-center gap-3 xl:gap-4">
+              {user && <NotificationBell />}
               {walletLink}
               {user ? (
                 <>
@@ -89,6 +91,7 @@ export default function Navbar() {
         {menuOpen && <div className="flex flex-col gap-5 border-t border-[#232F37] bg-black px-5 py-5 lg:hidden">
           <div className="flex flex-col gap-5">{navLinks}</div>
           {walletLink}
+          {user && <div className="flex items-center gap-3"><NotificationBell onNavigate={closeMenu} /><Link to="/notifications" onClick={closeMenu} className="text-sm text-[#ACBCBD] hover:text-white">Notification history</Link></div>}
           {user ? <>
             <NavLink to="/profile" onClick={closeMenu} className="flex items-center gap-3 rounded-lg border border-[#232F37] p-3 no-underline">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#00F0FF] text-black">{initials}</span>

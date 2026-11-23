@@ -7,6 +7,7 @@ const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const app = require("../src/app");
 const Booking = require("../src/models/Booking");
+const Notification = require("../src/models/Notification");
 const Station = require("../src/models/Station");
 const Transaction = require("../src/models/Transaction");
 const User = require("../src/models/User");
@@ -89,7 +90,7 @@ test("wallet and financial APIs use replica-set transactions and idempotent ledg
   const hello = await mongoose.connection.db.admin().command({ hello: 1 });
   assert.equal(hello.setName, "rs0", "MongoDB must be configured as replica set rs0");
   assert.equal(hello.isWritablePrimary, true, "replica-set primary must accept transactions");
-  await Promise.all([User.init(), Wallet.init(), Transaction.init(), Booking.init(), Station.init()]);
+  await Promise.all([User.init(), Wallet.init(), Transaction.init(), Booking.init(), Station.init(), Notification.init()]);
 
   admin = await addUser("admin", "admin");
   user = await addUser("user", "member");
@@ -148,6 +149,7 @@ test("wallet and financial APIs use replica-set transactions and idempotent ledg
     assert.equal(repeated.status, 200);
     assert.equal(repeated.body.data.idempotent, true);
     assert.equal(repeated.body.data.wallet.balanceMinor, 100000);
+    assert.equal(await Notification.countDocuments({ userId: user._id, type: "wallet_top_up" }), 1);
     const altered = await request("/api/v1/wallet/top-up", {
       method: "POST", token: userToken, idempotencyKey: `topup-${fixtureKey}-main`, body: { amountMinor: 120000 },
     });
@@ -168,7 +170,12 @@ test("wallet and financial APIs use replica-set transactions and idempotent ledg
     assert.equal(replay.status, 200);
     assert.equal(replay.body.data.idempotent, true);
     assert.equal(replay.body.data.wallet.balanceMinor, 65000);
+    assert.equal(await Notification.countDocuments({ userId: user._id, relatedBookingId: booking._id, type: "booking_confirmed" }), 1);
+    assert.equal(await Notification.countDocuments({ userId: user._id, relatedBookingId: booking._id, type: "payment_success" }), 1);
     assert.equal(await Transaction.countDocuments({ bookingId: booking._id, type: "booking_charge" }), 1);
+    assert.equal(await Notification.countDocuments({ userId: user._id, relatedBookingId: booking._id, type: "booking_confirmed" }), 1);
+    assert.equal(await Notification.countDocuments({ userId: user._id, relatedBookingId: booking._id, type: "payment_success" }), 1);
+    assert.equal(await Notification.countDocuments({ userId: admin._id, relatedBookingId: booking._id, type: "admin_booking_paid" }), 1);
     assert.equal((await request(`/api/v1/bookings/${booking.id}/pay`, { method: "POST", token: otherToken })).status, 404);
 
     const tooExpensive = await addBooking(user, 1000000);
@@ -184,6 +191,7 @@ test("wallet and financial APIs use replica-set transactions and idempotent ledg
     assert.equal(result.body.data.booking.paymentStatus, "not_required");
     assert.equal(result.body.data.transaction, null);
     assert.equal(await Transaction.countDocuments({ bookingId: booking._id }), 0);
+    assert.equal(await Notification.countDocuments({ userId: user._id, relatedBookingId: booking._id, type: "booking_confirmed" }), 1);
     assert.equal((await Wallet.findOne({ userId: user._id }).lean()).balanceMinor, 65000);
   });
 
@@ -198,6 +206,9 @@ test("wallet and financial APIs use replica-set transactions and idempotent ledg
     assert.equal(cancelled.body.data.wallet.balanceMinor, 100000);
     assert.equal(await Transaction.countDocuments({ bookingId: booking._id, type: "booking_charge" }), 1);
     assert.equal(await Transaction.countDocuments({ bookingId: booking._id, type: "refund" }), 1);
+    assert.equal(await Notification.countDocuments({ userId: user._id, relatedBookingId: booking._id, type: "booking_cancelled" }), 1);
+    assert.equal(await Notification.countDocuments({ userId: user._id, relatedBookingId: booking._id, type: "booking_refund" }), 1);
+    assert.equal(await Notification.countDocuments({ userId: admin._id, relatedBookingId: booking._id, type: "admin_booking_cancelled" }), 1);
     assert.equal((await request(`/api/v1/bookings/${booking.id}/cancel`, {
       method: "PATCH", token: userToken, body: { reason: "Repeat" },
     })).status, 409);
@@ -212,6 +223,7 @@ test("wallet and financial APIs use replica-set transactions and idempotent ledg
     assert.ok(concurrentTopUps.every((result) => [200, 201].includes(result.status)));
     assert.equal((await Wallet.findOne({ userId: otherUser._id }).lean()).balanceMinor, 5000);
     assert.equal(await Transaction.countDocuments({ userId: otherUser._id, reference: { $regex: /^topup:/ } }), 1);
+    assert.equal(await Notification.countDocuments({ userId: otherUser._id, type: "wallet_top_up" }), 1);
 
     const firstBooking = await addBooking(otherUser, 4000);
     const secondBooking = await addBooking(otherUser, 4000);
@@ -224,6 +236,7 @@ test("wallet and financial APIs use replica-set transactions and idempotent ledg
     assert.equal(finalWallet.balanceMinor, 1000);
     assert.ok(finalWallet.balanceMinor >= 0);
     assert.equal(await Transaction.countDocuments({ userId: otherUser._id, type: "booking_charge" }), 1);
+    assert.equal(await Notification.countDocuments({ userId: otherUser._id, type: "payment_success" }), 1);
   });
 
   await t.test("transaction history is private, filtered, and paginated", async () => {
@@ -275,13 +288,34 @@ test("wallet and financial APIs use replica-set transactions and idempotent ledg
     assert.equal((await Wallet.findById(wallet._id).lean()).balanceMinor, wallet.balanceMinor);
     assert.equal(await Transaction.countDocuments({ userId: user._id, type: "top_up", amountMinor: 777 }), 0);
   });
+
+  await t.test("failed notification write rolls back a wallet top-up and ledger entry", async () => {
+    const wallet = await Wallet.findOne({ userId: user._id }).lean();
+    const originalSave = Notification.prototype.save;
+    Notification.prototype.save = async function failingNotificationSave(options) {
+      if (this.type === "wallet_top_up") throw new Error("Injected notification write failure");
+      return originalSave.call(this, options);
+    };
+    try {
+      const response = await request("/api/v1/wallet/top-up", {
+        method: "POST", token: userToken, idempotencyKey: `notification-rollback-${fixtureKey}`, body: { amountMinor: 778 },
+      });
+      assert.equal(response.status, 500);
+    } finally {
+      Notification.prototype.save = originalSave;
+    }
+    assert.equal((await Wallet.findById(wallet._id).lean()).balanceMinor, wallet.balanceMinor);
+    assert.equal(await Transaction.countDocuments({ userId: user._id, type: "top_up", amountMinor: 778 }), 0);
+  });
 });
 
 after(async () => {
   if (server) await new Promise((resolve) => server.close(resolve));
   if (mongoose.connection.readyState === mongoose.ConnectionStates.connected) {
     if (fixtureBookingIds.length) await Booking.deleteMany({ _id: { $in: fixtureBookingIds } });
+    if (fixtureBookingIds.length) await Notification.deleteMany({ relatedBookingId: { $in: fixtureBookingIds } });
     if (fixtureUserIds.length) {
+      await Notification.deleteMany({ userId: { $in: fixtureUserIds } });
       await Transaction.deleteMany({ userId: { $in: fixtureUserIds } });
       await Wallet.deleteMany({ userId: { $in: fixtureUserIds } });
       await User.deleteMany({ _id: { $in: fixtureUserIds } });

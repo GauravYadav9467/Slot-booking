@@ -6,6 +6,8 @@ const authRoutes = require("./routes/authRoutes");
 const stationRoutes = require("./routes/stationRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const walletRoutes = require("./routes/walletRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -33,6 +35,8 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/stations", stationRoutes);
 app.use("/api/v1/bookings", bookingRoutes);
 app.use("/api/v1/wallet", walletRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/admin", adminRoutes);
 
 app.use((req, res, next) => {
   const error = new Error("Route not found.");

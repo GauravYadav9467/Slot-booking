@@ -52,6 +52,22 @@ export type Transaction = {
   bookingId?: string | null;
   createdAt: string;
 };
+export type Notification = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  relatedBookingId: string | null;
+  relatedTransactionId: string | null;
+  readAt: string | null;
+  createdAt: string;
+};
+export type AdminOverview = {
+  stations: { active: number; maintenance: number; inactive: number };
+  bookings: { total: number; pending: number; confirmed: number; cancelled: number; completed: number; no_show: number };
+  recentBookings: Array<{ id: string; user: string; station: string; startAt: string; status: Booking["status"]; paymentStatus: Booking["paymentStatus"] }>;
+  recentNotifications: Notification[];
+};
 export type Pagination = { page: number; limit: number; total: number; totalPages: number };
 export type Page<T> = { [key: string]: T[] | Pagination };
 export type Availability = {
@@ -220,6 +236,28 @@ export function getAdminBookings(token: string, params: { status?: string; stati
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => { if (value) query.set(key, String(value)); });
   return apiRequest<{ bookings: Booking[]; pagination: Pagination }>(`/bookings/admin${query.size ? `?${query}` : ""}`, { token });
+}
+
+export function getAdminOverview(token: string) {
+  return apiRequest<{ overview: AdminOverview }>("/admin/overview", { token });
+}
+
+export function getNotifications(token: string, params: { status?: "unread" | "read"; scope?: "operations"; page?: number; limit?: number } = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
+  return apiRequest<{ notifications: Notification[]; pagination: Pagination }>(`/notifications${query.size ? `?${query}` : ""}`, { token });
+}
+
+export function getUnreadNotificationCount(token: string) {
+  return apiRequest<{ unreadCount: number }>("/notifications/unread-count", { token });
+}
+
+export function markNotificationRead(token: string, id: string) {
+  return apiRequest<{ notification: Notification }>(`/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH", token });
+}
+
+export function markAllNotificationsRead(token: string) {
+  return apiRequest<{ markedRead: number }>("/notifications/read-all", { method: "PATCH", token });
 }
 
 export function getWallet(token: string) {

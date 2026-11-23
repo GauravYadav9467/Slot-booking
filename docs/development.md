@@ -49,7 +49,7 @@ Start MongoDB before starting the backend. The connection string may include cre
 
 ### Configure a local single-node replica set on Windows
 
-Wallet balance changes require multi-document MongoDB transactions. Do not run the financial API or its integration tests against a standalone MongoDB server. If MongoDB is currently standalone, configure it manually; this project does not change Windows services or MongoDB configuration.
+Booking creation and wallet balance changes use multi-document MongoDB transactions so their notifications commit atomically. Do not run booking creation, financial APIs, or their integration tests against a standalone MongoDB server. If MongoDB is currently standalone, configure it manually; this project does not change Windows services or MongoDB configuration.
 
 1. Open **Services** and stop the MongoDB service. Locate its existing configuration file (the MSI installation commonly places `mongod.cfg` under `C:\Program Files\MongoDB\Server\<version>\bin`). Preserve existing storage, network, and security settings.
 2. Add the following YAML section to that file:
@@ -68,7 +68,7 @@ Wallet balance changes require multi-document MongoDB transactions. Do not run t
 
    Wait until the local member is `PRIMARY`. If this instance is already part of a replica set, do not run `rs.initiate()` again.
 4. Configure `MONGODB_URI` in the ignored `server/.env` to include the set name, for example `mongodb://127.0.0.1:27017/nexus_arena?replicaSet=rs0`. Preserve any local authentication options if enabled.
-5. Verify `hello` reports `setName: "rs0"` and `isWritablePrimary: true` before using financial endpoints.
+5. Verify `hello` reports `setName: "rs0"` and `isWritablePrimary: true` before using booking creation or financial endpoints.
 
 ## Start the applications
 
@@ -86,12 +86,13 @@ cd client
 npm run dev
 ```
 
-The API listens at `http://localhost:5000` by default. The Vite development server prints its local URL. The client uses the backend for account, station, booking, and wallet flows. Notifications are not implemented.
+The API listens at `http://localhost:5000` by default. The Vite development server prints its local URL. The client uses the backend for account, station, booking, wallet, and in-app notification flows. Notification counts refresh on route changes, when the browser regains focus, when the panel opens, and after relevant account actions; no WebSocket or polling service is required.
 
 ## Local workflow and checks
 
 - Backend syntax: `Get-ChildItem src -Recurse -Filter '*.js' | ForEach-Object { node --check $_.FullName }` from `server/`.
 - Backend integration tests: `npm test` from `server/`. MongoDB must be running as replica set `rs0` and `MONGODB_URI` configured. Tests assert the replica-set name, use unique temporary records, and clean them up.
+- Notification and admin overview integration tests are included in the backend suite and run against the same local replica-set database.
 - Frontend production build: `npm run build` from `client/`.
 - Frontend lint: `npm run lint` from `client/`.
 - API health check: `GET http://localhost:5000/api/v1/health`.

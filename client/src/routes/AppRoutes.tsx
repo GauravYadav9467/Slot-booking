@@ -9,6 +9,7 @@ import {
   TransactionHistoryPage, WalletPage,
 } from "../pages/UserPages";
 import { AdminBookingsPage, AdminDashboardPage, AdminStationsPage } from "../pages/AdminPages";
+import { NotificationHistoryPage } from "../pages/NotificationPages";
 
 function ProtectedArea({ admin = false }: { admin?: boolean }) {
   const { user, token, loading, sessionError, refreshProfile, logout } = useAuth();
@@ -39,6 +40,7 @@ export default function AppRoutes() {
         <Route path="/bookings/:id" element={<BookingDetailPage />} />
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/transactions" element={<TransactionHistoryPage />} />
+        <Route path="/notifications" element={<NotificationHistoryPage />} />
       </Route>
       <Route element={<ProtectedArea admin />}>
         <Route path="/admin" element={<AdminDashboardPage />} />

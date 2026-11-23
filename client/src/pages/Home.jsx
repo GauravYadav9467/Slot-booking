@@ -105,6 +105,7 @@ export default function Home() {
       setSavedBookingId(result.booking.id);
       try {
         await payBooking(token, result.booking.id);
+        window.dispatchEvent(new Event("nexus-notifications-refresh"));
         navigate(`/bookings/${result.booking.id}`, { state: { notice: "Your station is reserved and paid from your wallet." } });
       } catch (paymentError) {
         const detail = paymentError instanceof ApiError && paymentError.status === 409
