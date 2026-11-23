@@ -28,19 +28,19 @@
 
 **Objective:** Check availability and create, view, filter, and cancel future station reservations.
 
-**Deliverables:** Timezone-explicit availability and booking APIs, overlap checks using half-open intervals, configurable session duration rules, backend paise pricing, user/admin booking access, cancellation rules, pagination, and expiring station reservation leases for standalone MongoDB.
+**Deliverables:** Timezone-explicit availability and booking APIs, overlap checks using half-open intervals, configurable session duration rules, backend paise pricing, user/admin booking access, cancellation rules, pagination, and expiring station reservation leases for concurrent booking API requests.
 
-## Milestone 6: Wallet and transactions — PLANNED
+## Milestone 6: Wallet and transactions — COMPLETED
 
-**Objective:** Add wallet history and controlled balance changes for booking charges and refunds.
+**Objective:** Add wallet history and atomic, auditable balance changes for simulated top-ups, booking charges, refunds, and administrator adjustments.
 
-**Deliverables:** Wallet views, transaction history, idempotent ledger operations, and an explicit payment/top-up demonstration flow. Booking cancellation currently does not refund funds.
+**Deliverables:** Authenticated wallet and transaction history APIs, configurable simulated top-ups, booking payment, refunds for successfully paid future bookings cancelled before start, and admin adjustments with mandatory reasons. Every balance and ledger operation uses a MongoDB session transaction on replica set `rs0`; unique references and conditional balance updates provide idempotency and prevent duplicate processing or negative balances. Top-ups are not real payments.
 
 ## Milestone 7: Notifications — PLANNED
 
 **Objective:** Notify users of booking and account events.
 
-**Deliverables:** Notification creation, unread/read state, user notification APIs, and a client notification view.
+**Deliverables:** Notification creation for wallet and booking events, unread/read state, user notification APIs, and a client notification view.
 
 ## Milestone 8: Frontend integration — PLANNED
 

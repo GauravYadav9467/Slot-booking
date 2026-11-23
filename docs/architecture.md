@@ -3,9 +3,9 @@
 ## Components
 
 - **React client:** Vite, TypeScript, and Tailwind CSS render the current lounge home-page prototype. The client does not yet call the backend.
-- **Express API:** CommonJS modules mount versioned health, authentication, station, and booking routes. Helmet, CORS, JSON parsing, and centralized error handling are configured in the application.
+- **Express API:** CommonJS modules mount versioned health, authentication, station, booking, and wallet routes. Helmet, CORS, JSON parsing, and centralized error handling are configured in the application.
 - **Middleware:** Authentication verifies JWTs and reloads the current user; role middleware protects admin routes; validators normalize and reject invalid inputs.
-- **Controllers and services:** Controllers map HTTP requests and responses. Services implement authentication, station, and booking rules.
+- **Controllers and services:** Controllers map HTTP requests and responses. Services implement authentication, station, booking, and wallet rules. Wallet service operations coordinate financial writes through MongoDB sessions.
 - **Mongoose and MongoDB:** Models store users, stations, bookings, wallets, transactions, notifications, and the supporting station reservation lease.
 
 ```mermaid
@@ -19,8 +19,10 @@ flowchart LR
   Controllers --> Services[Application services]
   Services --> Models[Mongoose models]
   Services --> Lease[Station reservation lease]
+  Services --> Txn[Replica-set session transaction]
   Models --> Mongo[(MongoDB)]
   Lease --> Mongo
+  Txn --> Mongo
 ```
 
 ## Request and response flow
@@ -29,7 +31,7 @@ flowchart LR
 2. A route applies authentication and, where required, admin authorization.
 3. Validators check IDs, fields, timestamps, filters, and pagination.
 4. A controller calls a service and returns a status code with a JSON envelope.
-5. Services query or update Mongoose models. Errors are passed to centralized error handling.
+5. Services query or update Mongoose models. Financial services perform all wallet balance, ledger, and booking payment/refund updates inside a MongoDB session transaction. Errors are passed to centralized error handling.
 
 ## Authentication flow
 
@@ -37,13 +39,17 @@ Registration normalizes the email, hashes the password, creates a user with the 
 
 Logout is expiry-based. The API tells the client to discard its token but does not maintain a revocation list; a copied token remains valid until it expires or the account becomes blocked.
 
-## Booking concurrency and standalone MongoDB
+## Booking concurrency and financial transactions
 
-The configured local MongoDB is standalone, so booking creation does not rely on multi-document transactions. The booking service acquires a MongoDB-backed lease with one unique lock record per station. Acquisition uses an insert protected by the unique station index, or an atomic takeover if the existing lease has expired. The booking service rechecks station status and time overlap while holding the lease, saves the booking, then releases only the lease with its own token.
+Booking creation acquires a MongoDB-backed lease with one unique lock record per station. Acquisition uses an insert protected by the unique station index, or an atomic takeover if the existing lease has expired. The booking service rechecks station status and time overlap while holding the lease, saves the booking, then releases only the lease with its own token.
 
 If a process exits unexpectedly, the lease becomes reclaimable after `BOOKING_LOCK_TTL_MS`. An expired record is replaced on the next reservation attempt. Availability reports a live lease as `reservation_in_progress`. Integration tests issue concurrent requests against local MongoDB and verify that only one overlapping request succeeds.
 
-This protects booking writes that use the booking API and finish within the configured lease. Direct database writes bypass the lease, and a process paused longer than the lease is outside this guarantee. A replica-set deployment with transactions would provide stronger multi-document atomicity.
+Direct database writes bypass application-level booking leases and ledger policy. Wallet changes require a MongoDB replica set named `rs0`. Top-ups, booking charges, eligible cancellation refunds, and admin adjustments use `withTransaction` with snapshot reads and majority writes. A balance update, its unique-reference transaction record, and (for bookings) payment/refund state commit or roll back together. Conditional balance updates protect against negative balances and safe-integer overflow; unique transaction references make operations idempotent. The MongoDB driver retries transient transaction errors. There is no non-transactional fallback.
+
+Top-ups and admin adjustments require an `Idempotency-Key`; keys are hashed into unique transaction references and reused keys must match the original operation. Booking charges and refunds use deterministic references derived from the booking ID. Concurrent transactions against one wallet conflict and retry against the committed balance, so competing charges cannot both spend the same funds.
+
+The simulated top-up does not contact a payment processor, and this academic wallet is not a real-money payment system.
 
 ## Important technical decisions
 
@@ -51,5 +57,7 @@ This protects booking writes that use the booking API and finish within the conf
 - Reservation intervals are half-open: `[startAt, endAt)`. An end time equal to another booking's start time is allowed.
 - Session duration defaults to 30-minute increments, minimum 30 minutes, maximum 12 hours. These values are environment-configurable.
 - Prices are stored in integer paise. The server uses the station rate snapshot and rounds a fractional paise upward; no discounts are applied.
-- New bookings start as `pending`. Pending and confirmed bookings block overlapping reservations. Payment and confirmation behavior belong to Milestone 6.
-- Cancellation is allowed before the session starts for pending or confirmed bookings. It preserves the booking record and does not issue a refund.
+- New bookings start as `pending` and `unpaid`. Pending and confirmed bookings block overlapping reservations. A successful wallet charge sets the booking to `confirmed` and `paid`.
+- Cancellation is allowed before the session starts for pending or confirmed bookings. It preserves the booking record; a paid booking is refunded to its wallet within the same transaction, while an unpaid booking is cancelled without a refund.
+- Booking prices are charged from `priceSnapshot.totalMinor`; client-provided prices are not accepted.
+- A zero-price booking can be confirmed with `paymentStatus: not_required`; it creates no wallet or ledger entry and is never refunded.

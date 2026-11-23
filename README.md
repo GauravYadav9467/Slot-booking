@@ -1,15 +1,16 @@
 # NEXUS ARENA — Gaming Lounge & Station Booking System
 
-NEXUS ARENA is an academic gaming lounge project for station discovery, user authentication, and time-based gaming station reservations. The React client currently presents a static home-page prototype; the REST backend implements authentication, station management, and booking APIs.
+NEXUS ARENA is an academic gaming lounge project for station discovery, user authentication, station reservations, and simulated wallet payments. The React client currently presents a static home-page prototype; the REST backend implements authentication, station management, bookings, and wallet APIs.
 
 ## Implemented features
 
 - User registration and login with bcrypt password hashing and JWT authentication.
 - Admin-only station management and public station search, filtering, and pagination.
 - Availability checks, future bookings, server-calculated integer-paise pricing, booking history, cancellation, and admin booking views.
-- MongoDB-backed reservation leases to coordinate concurrent booking API requests on the local standalone MongoDB setup.
+- MongoDB-backed reservation leases to coordinate concurrent booking API requests.
+- Transaction-backed simulated wallet top-ups, booking charges, cancellation refunds, transaction history, and admin adjustments.
 
-Wallet and transaction flows, notifications, and frontend API integration are planned milestones. Booking cancellation does not issue a wallet refund.
+Top-ups are a local simulation and do not charge a payment method or represent funds received. Wallet operations require MongoDB replica-set transactions. Notifications and frontend API integration remain planned. Eligible future booking cancellations refund successful wallet charges; unpaid cancellations do not issue refunds.
 
 ## Technology stack
 
@@ -45,7 +46,7 @@ cd ..\client
 npm ci
 ```
 
-Configure `server/.env` using [the environment guide](docs/development.md). Start a local MongoDB server, then run the API and client in separate terminals:
+Configure `server/.env` using [the environment guide](docs/development.md). The backend financial APIs require a local MongoDB replica set named `rs0`; configure and verify it before starting the backend or running tests. Then run the API and client in separate terminals:
 
 ```powershell
 cd server
@@ -57,7 +58,7 @@ cd client
 npm run dev
 ```
 
-Run backend integration checks from `server/` with `npm test`. These tests require the configured MongoDB database.
+Run backend integration checks from `server/` with `npm test`. These tests require the configured `rs0` MongoDB replica set.
 
 ## Documentation
 

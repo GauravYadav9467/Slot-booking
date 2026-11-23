@@ -2,6 +2,7 @@ const { randomUUID } = require("node:crypto");
 const Booking = require("../models/Booking");
 const Station = require("../models/Station");
 const StationReservationLock = require("../models/StationReservationLock");
+const walletService = require("./walletService");
 
 const activeStatuses = ["pending", "confirmed"];
 const stationFields = "name code type status";
@@ -74,6 +75,7 @@ function safeBooking(booking, { includeUser = false } = {}) {
     endAt: new Date(booking.endAt).toISOString(),
     durationMinutes: booking.durationMinutes,
     status: booking.status,
+    paymentStatus: booking.paymentStatus || "unpaid",
     priceSnapshot: {
       hourlyRateMinor: booking.priceSnapshot.hourlyRateMinor,
       subtotalMinor: booking.priceSnapshot.subtotalMinor,
@@ -82,6 +84,7 @@ function safeBooking(booking, { includeUser = false } = {}) {
     },
     currency: booking.currency,
     transactionId: relationId(booking.transactionId),
+    refundTransactionId: relationId(booking.refundTransactionId),
     cancellationReason: booking.cancellationReason,
     createdAt: new Date(booking.createdAt).toISOString(),
     updatedAt: new Date(booking.updatedAt).toISOString(),
@@ -251,33 +254,7 @@ async function getBookingById(id, viewer) {
 }
 
 async function cancelBooking(id, viewer, reason) {
-  const booking = await Booking.findById(id).select("userId startAt status").lean();
-  if (!booking) throw createError("Booking not found.", 404);
-
-  if (viewer.role !== "admin" && booking.userId.toString() !== viewer.userId) {
-    throw createError("Booking not found.", 404);
-  }
-  if (!activeStatuses.includes(booking.status)) {
-    throw createError("Only pending or confirmed bookings can be cancelled.", 409);
-  }
-  if (booking.startAt <= new Date()) {
-    throw createError("A booking cannot be cancelled after its start time.", 409);
-  }
-
-  const cancellationReason = reason || `Cancelled by ${viewer.role}.`;
-  const updated = await Booking.findOneAndUpdate(
-    {
-      _id: id,
-      status: { $in: activeStatuses },
-      startAt: { $gt: new Date() },
-      ...(viewer.role === "admin" ? {} : { userId: viewer.userId }),
-    },
-    { $set: { status: "cancelled", cancellationReason } },
-    { returnDocument: "after", runValidators: true }
-  );
-
-  if (!updated) throw createError("This booking is no longer eligible for cancellation.", 409);
-  return safeBooking(updated);
+  return walletService.cancelBooking(id, viewer, reason);
 }
 
 function adminBookingFilter({ status, stationId, from, to }) {

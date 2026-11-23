@@ -77,6 +77,7 @@ Creation returns HTTP 201 with the station record. Public listing returns `{ "it
 |---|---|---|---|
 | GET | `/bookings/availability` | None | Public availability check |
 | POST | `/bookings` | Bearer token | Any active user |
+| POST | `/bookings/:id/pay` | Bearer token | Booking owner |
 | GET | `/bookings/my` | Bearer token | Own booking history |
 | GET | `/bookings/:id` | Bearer token | Owner or admin |
 | PATCH | `/bookings/:id/cancel` | Bearer token | Owner or admin |
@@ -132,7 +133,59 @@ Cancellation accepts an optional reason:
 { "reason": "Plans changed" }
 ```
 
-Only pending or confirmed bookings that have not started can be cancelled. Missing reasons are recorded as `Cancelled by user.` or `Cancelled by admin.`. No wallet refund is performed in this milestone.
+Only pending or confirmed bookings that have not started can be cancelled. Missing reasons are recorded as `Cancelled by user.` or `Cancelled by admin.`. Cancellation refunds a successful wallet payment in the same MongoDB transaction; unpaid bookings are cancelled without a refund. Refund ledger entries are unique per booking.
+
+Pay for an eligible booking with `POST /bookings/:id/pay`. The request has no body; client-supplied amounts are rejected. The server charges `priceSnapshot.totalMinor`, deducts the owner's wallet, writes a `booking_charge` transaction, and changes the booking to `confirmed` / `paid` atomically. Repeating payment returns the original charge without deducting again. A zero-price booking is confirmed with `paymentStatus: "not_required"` and creates no financial ledger record. Example response shape:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "booking": { "id": "665f00000000000000000003", "status": "confirmed", "paymentStatus": "paid" },
+    "transaction": { "type": "booking_charge", "direction": "debit", "amountMinor": 12000, "currency": "INR", "status": "success" },
+    "wallet": { "balanceMinor": 38000, "currency": "INR", "status": "active" },
+    "idempotent": false
+  }
+}
+```
+
+## Implemented: wallets and transactions
+
+| Method | Endpoint | Authentication | Role |
+|---|---|---|---|
+| GET | `/wallet` | Bearer token | Current user's wallet only |
+| GET | `/wallet/transactions` | Bearer token | Current user's history only |
+| POST | `/wallet/top-up` | Bearer token + `Idempotency-Key` | Current user; simulated only |
+| POST | `/wallet/admin/adjustments` | Bearer token + `Idempotency-Key` | Admin |
+
+`GET /wallet` accepts no query parameters and returns `{ "wallet": { "id", "balanceMinor", "currency", "status", "updatedAt" } }`. The user ID comes from the authenticated token.
+
+`GET /wallet/transactions` accepts `type` (`top_up`, `booking_charge`, `refund`, `adjustment`), `status` (`pending`, `success`, `failed`), `page`, and `limit` (maximum 100). It returns the current user's transactions newest first with pagination. Other user, wallet, and credential fields are not returned.
+
+Top-up accepts a positive integer `amountMinor` in paise. The default configurable limits are 100 to 1,000,000 paise (₹1 to ₹10,000), set by `WALLET_TOPUP_MIN_MINOR` and `WALLET_TOPUP_MAX_MINOR`. Example:
+
+```http
+POST /api/v1/wallet/top-up
+Authorization: Bearer <token>
+Idempotency-Key: terminal-session-2026-0001
+Content-Type: application/json
+```
+
+```json
+{ "amountMinor": 50000 }
+```
+
+The service labels the ledger entry as a simulated top-up. It does not call a payment provider or imply money was received. A new operation returns HTTP 201; replaying the same key and same amount returns HTTP 200 without a second credit. Reusing a key with different details returns 409.
+
+Admins may adjust a user's wallet with a required reason, direction, positive integer paise amount, and target `userId`. Example body:
+
+```json
+{ "userId": "665f00000000000000000002", "direction": "credit", "amountMinor": 500, "reason": "Till reconciliation correction" }
+```
+
+The request also requires an `Idempotency-Key`. Adjustments are recorded as `adjustment` transactions; no direct balance-only operation is exposed.
+
+Financial operations use MongoDB sessions and multi-document transactions on replica set `rs0`. Unique transaction references make top-ups, adjustments, booking charges, and refunds idempotent. Conditional balance updates prevent negative balances. Balance changes, ledger records, and booking payment/refund state commit or roll back together. There is no standalone-server fallback.
 
 ## Error responses
 
@@ -142,10 +195,10 @@ Only pending or confirmed bookings that have not started can be cancelled. Missi
 | 401 | Missing or invalid authentication |
 | 403 | Role or account does not permit the operation |
 | 404 | Station or booking does not exist; a user does not own the booking |
-| 409 | Duplicate/conflicting booking, unavailable station, active reservation lease, or ineligible cancellation |
+| 409 | Duplicate/conflicting booking or idempotency key, unavailable station, active reservation lease, insufficient balance, or ineligible payment/cancellation |
 | 422 | Price exceeds supported integer limits |
 | 500 | Unexpected server error; internal database details are not returned |
 
 ## Planned APIs
 
-Wallet balance, top-up, transaction, refund, and notification APIs are not implemented. Frontend API integration is also planned.
+Notification APIs and frontend API integration are planned. Top-ups are simulated; real payment-provider integration is not implemented.

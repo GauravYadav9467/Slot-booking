@@ -231,6 +231,13 @@ function validateCancellation(req, res, next) {
   return next();
 }
 
+function validateBookingPayment(req, res, next) {
+  if (req.body !== undefined && (!isPlainObject(req.body) || Object.keys(req.body).length !== 0)) {
+    return fail(next, "Booking payment does not accept a request body or client-supplied amount.");
+  }
+  return next();
+}
+
 module.exports = {
   validateAvailability,
   validateCreateBooking,
@@ -238,4 +245,5 @@ module.exports = {
   validateMyBookings,
   validateAdminBookings,
   validateCancellation,
+  validateBookingPayment,
 };

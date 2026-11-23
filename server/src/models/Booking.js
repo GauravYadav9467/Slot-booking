@@ -72,6 +72,11 @@ const bookingSchema = new mongoose.Schema(
       enum: ["pending", "confirmed", "cancelled", "completed", "no_show"],
       default: "pending",
     },
+    paymentStatus: {
+      type: String,
+      enum: ["unpaid", "paid", "refunded", "not_required"],
+      default: "unpaid",
+    },
     priceSnapshot: {
       type: priceSnapshotSchema,
       required: true,
@@ -83,6 +88,10 @@ const bookingSchema = new mongoose.Schema(
       trim: true,
     },
     transactionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Transaction",
+    },
+    refundTransactionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Transaction",
     },

@@ -14,13 +14,13 @@ Station availability, session times, and booking records are difficult to coordi
 - Authenticate customers and restrict administrative operations by role.
 - Check station availability and prevent overlapping reservations.
 - Keep booking prices and statuses on the server as authoritative records.
-- Provide a foundation for later wallet, notification, and frontend integration work.
+- Record wallet activity atomically and preserve a transaction ledger for simulated top-ups, booking charges, refunds, and admin adjustments.
 
 ## Scope
 
-The current implementation includes a React/Vite client prototype and a REST backend for health checks, authentication, station management, and bookings. The client currently displays a static station and checkout concept; it is not connected to these APIs.
+The current implementation includes a React/Vite client prototype and a REST backend for health checks, authentication, station management, bookings, and wallet transactions. The client currently displays a static station and checkout concept; it is not connected to these APIs. Financial endpoints require MongoDB multi-document transactions on replica set `rs0`.
 
-Wallet funding, refunds, transaction processing, notifications, tournaments, and payment-provider integration are outside the completed scope. They are planned for later milestones.
+Wallet ledger operations are implemented as local simulations. Simulated top-ups do not integrate with a payment provider and do not claim real money was received. Notifications, tournaments, and payment-provider integration are outside the current scope.
 
 ## Main features
 
@@ -30,7 +30,9 @@ Wallet funding, refunds, transaction processing, notifications, tournaments, and
 - Safe current-user profile responses and admin role middleware.
 - Station creation, updates, status changes, public listing, search, filtering, and pagination.
 - Booking availability checks, future reservations, server-calculated prices, booking history, details, cancellation, and admin listing.
-- Per-station expiring reservation leases to serialize booking API writes on standalone MongoDB.
+- Per-station expiring reservation leases to serialize concurrent booking API writes.
+- Session-backed simulated wallet top-ups, booking payment deductions, eligible cancellation refunds, and administrator adjustments.
+- Idempotency references and transaction-backed balance changes to prevent duplicate credits, charges, and refunds.
 
 ### Current client
 
@@ -60,9 +62,12 @@ Public registration always assigns the `user` role. There is no public admin-reg
 5. Authenticated users can book an active station for a valid future interval.
 6. The server calculates the booking price in integer paise and preserves the rate snapshot.
 7. Users can view and cancel their own eligible bookings; administrators can view all bookings.
-8. The system retains cancelled and deactivated records for history.
+8. Users can view their own wallet and transaction history, make simulated top-ups, and pay for their own eligible bookings.
+9. Successfully paid future bookings are refunded when cancelled before start; unpaid cancellations do not create refunds.
+10. Administrators can make reasoned wallet adjustments, recorded as ledger entries.
+11. The system retains cancelled bookings and transaction records for history.
 
-Wallet balances, transaction processing, notifications, and a connected client booking flow remain planned work.
+Notifications and a connected client booking flow remain planned work.
 
 ## Non-functional requirements
 
@@ -70,5 +75,7 @@ Wallet balances, transaction processing, notifications, and a connected client b
 - Do not expose password hashes or trust client-supplied user IDs or prices.
 - Keep secrets in ignored environment files, not in source control.
 - Store timestamps as UTC dates; accept explicit ISO 8601 offsets at the API boundary.
+- Commit wallet balance changes, ledger entries, and booking payment/refund state in MongoDB sessions and transactions.
+- Require unique idempotency references and conditional balance updates to prevent duplicate processing and negative balances.
 - Use indexes for ownership, station time conflicts, unique identifiers, and reservation locks.
 - Keep API modules small and separated into routes, controllers, services, models, and validators.

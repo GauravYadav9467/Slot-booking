@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const authRoutes = require("./routes/authRoutes");
 const stationRoutes = require("./routes/stationRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
+const walletRoutes = require("./routes/walletRoutes");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -31,6 +32,7 @@ app.get("/api/v1/health", (req, res) => {
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/stations", stationRoutes);
 app.use("/api/v1/bookings", bookingRoutes);
+app.use("/api/v1/wallet", walletRoutes);
 
 app.use((req, res, next) => {
   const error = new Error("Route not found.");
