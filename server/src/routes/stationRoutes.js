@@ -5,6 +5,7 @@ const { requireAdmin } = require("../middleware/roleMiddleware");
 const {
   validateCreateStation,
   validateStationList,
+  validateAdminStationList,
   validateStationId,
   validateUpdateStation,
   validateStationStatus,
@@ -16,6 +17,8 @@ router
   .route("/")
   .get(validateStationList, stationController.listStations)
   .post(authenticate, requireAdmin, validateCreateStation, stationController.createStation);
+
+router.get("/admin", authenticate, requireAdmin, validateAdminStationList, stationController.listAdminStations);
 
 router.patch(
   "/:id/status",

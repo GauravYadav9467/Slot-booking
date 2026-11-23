@@ -48,13 +48,14 @@ Example safe profile:
 | Method | Endpoint | Authentication | Role |
 |---|---|---|---|
 | GET | `/stations` | None | Public; active stations only |
+| GET | `/stations/admin` | Bearer token | Admin; all station statuses |
 | GET | `/stations/:id` | None | Public station details |
 | POST | `/stations` | Bearer token | Admin |
 | PATCH | `/stations/:id` | Bearer token | Admin |
 | PATCH | `/stations/:id/status` | Bearer token | Admin |
 | DELETE | `/stations/:id` | Bearer token | Admin; deactivates, does not delete |
 
-`GET /stations` accepts `type` (`PC`, `Console`, `VR`), `search`, `page`, and `limit` (maximum 100). Admin creation accepts station fields including `name`, `code`, `type`, `hourlyRateMinor`, `specifications`, and `installedGames`. Status updates accept `{ "status": "maintenance" }`.
+`GET /stations` accepts `type` (`PC`, `Console`, `VR`), `search`, `page`, and `limit` (maximum 100) and always returns active stations only. `GET /stations/admin` has the same filters plus optional `status` (`active`, `maintenance`, or `inactive`); without a status filter it returns every station. The admin listing requires an admin bearer token. Admin creation accepts station fields including `name`, `code`, `type`, `hourlyRateMinor`, `specifications`, and `installedGames`. Status updates accept `{ "status": "maintenance" }`.
 
 Example create request:
 
@@ -203,4 +204,4 @@ Financial operations use MongoDB sessions and multi-document transactions on rep
 
 ## Client integration
 
-The client uses the endpoints above for registration, login, profile, public stations, availability, booking creation/payment/history/cancellation, wallet history/top-ups, and admin booking/station changes. The admin station screen can only list active stations because `GET /stations` intentionally filters to active records; no all-status admin listing endpoint currently exists. Notification APIs and client notifications are not implemented. Top-ups are simulated; real payment-provider integration is not implemented.
+The client uses the endpoints above for registration, login, profile, public stations, availability, booking creation/payment/history/cancellation, wallet history/top-ups, and admin booking/station changes. Admin station management uses `GET /stations/admin` to rediscover records at every status. Notification APIs and client notifications are not implemented. Top-ups are simulated; real payment-provider integration is not implemented.

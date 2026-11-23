@@ -10,7 +10,7 @@ NEXUS ARENA is an academic gaming lounge project for station discovery, user aut
 - MongoDB-backed reservation leases to coordinate concurrent booking API requests.
 - Transaction-backed simulated wallet top-ups, booking charges, cancellation refunds, transaction history, and admin adjustments.
 
-Top-ups are a local simulation and do not charge a payment method or represent funds received. Wallet operations require MongoDB replica-set transactions. Notifications remain planned. Eligible future booking cancellations refund successful wallet charges; unpaid cancellations do not issue refunds. Admin station discovery currently uses the active-only public listing; the backend does not yet expose all statuses to admins.
+Top-ups are a local simulation and do not charge a payment method or represent funds received. Wallet operations require MongoDB replica-set transactions. Notifications remain planned. Eligible future booking cancellations refund successful wallet charges; unpaid cancellations do not issue refunds. Admins can list and manage stations across active, maintenance, and inactive statuses; public station discovery remains active-only.
 
 ## Technology stack
 

@@ -53,7 +53,16 @@ async function createStation(input) {
 }
 
 async function listStations({ type, search, page, limit }) {
-  const filter = { status: "active" };
+  return queryStations({ type, search, page, limit, status: "active" });
+}
+
+async function listAdminStations({ type, search, status, page, limit }) {
+  return queryStations({ type, search, status, page, limit });
+}
+
+async function queryStations({ type, search, status, page, limit }) {
+  const filter = {};
+  if (status) filter.status = status;
   if (type) filter.type = type;
   if (search) {
     const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -121,6 +130,7 @@ async function deactivateStation(id) {
 module.exports = {
   createStation,
   listStations,
+  listAdminStations,
   getStationById,
   updateStation,
   updateStationStatus,

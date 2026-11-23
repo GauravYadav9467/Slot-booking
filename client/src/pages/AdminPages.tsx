@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { createStation, deactivateStation, formatMinor, getAdminBookings, getErrorMessage, getStations, updateStation, updateStationStatus, type Booking, type Pagination, type Station } from "../lib/api";
+import { createStation, deactivateStation, formatMinor, getAdminBookings, getAdminStations, getErrorMessage, getStations, updateStation, updateStationStatus, type Booking, type Pagination, type Station } from "../lib/api";
 import { buttonPrimary, buttonSecondary, inputClass, LoadingState, Notice, PageHeading } from "../components/ui/Feedback";
 import { formatKolkataDateTime } from "../lib/bookingTime";
 
@@ -52,11 +52,12 @@ export function AdminStationsPage() {
   const [notice, setNotice] = useState("");
   async function load() {
     setLoading(true);
-    try { const result = await getStations({ search: search.trim() || undefined, page, limit: 20 }); setStations(result.stations); setPagination(result.pagination); setError(""); }
+    if (!token) return;
+    try { const result = await getAdminStations(token, { search: search.trim() || undefined, page, limit: 20 }); setStations(result.stations); setPagination(result.pagination); setError(""); }
     catch (e) { setError(getErrorMessage(e)); }
     finally { setLoading(false); }
   }
-  useEffect(() => { void load(); }, [search, page]);
+  useEffect(() => { void load(); }, [token, search, page]);
 
   function beginEdit(station: Station) {
     setEditing(station.id);
@@ -119,12 +120,11 @@ export function AdminStationsPage() {
       </form>
     </section>
 
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><label className="w-full max-w-sm text-xs font-bold text-[#AAB7C0]">Search active stations<input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} className={`${inputClass} mt-1`} placeholder="Search by name" /></label><span className="text-xs text-[#84919D]">{pagination.total} active stations</span></div>
-    <Notice kind="info">The current station listing API returns active stations only. Stations changed to maintenance or inactive stay visible here until this page reloads; the backend does not yet provide an all-status admin listing.</Notice>
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><label className="w-full max-w-sm text-xs font-bold text-[#AAB7C0]">Search all stations<input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} className={`${inputClass} mt-1`} placeholder="Search by name" /></label><span className="text-xs text-[#84919D]">{pagination.total} stations</span></div>
     {loading ? <LoadingState label="Loading station inventory…" /> : stations.length ? <div className="mt-4 grid gap-4 lg:grid-cols-2">{stations.map((station) => <article key={station.id} className="rounded-2xl border border-[#164B54] bg-[#151A20] p-5">
       <div className="flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-wide text-[#4DDCE9]">{station.code} · {station.type}</p><h3 className="mt-1 text-lg font-bold text-white">{station.name}</h3><p className="mt-1 text-sm text-[#A5B4BC]">{formatMinor(station.hourlyRateMinor)} / hour</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${station.status === "active" ? "bg-[#123C36] text-[#38E8BA]" : "bg-[#332A3C] text-[#C9A3E8]"}`}>{station.status}</span></div>
       <div className="mt-5 flex flex-wrap gap-2"><button onClick={() => beginEdit(station)} className={buttonSecondary}>Edit</button><select value={station.status} disabled={busy} onChange={(e) => void changeStatus(station, e.target.value as Station["status"])} className="rounded-lg border border-[#303943] bg-[#0D1218] px-3 py-2 text-xs text-white"><option value="active">Active</option><option value="maintenance">Maintenance</option><option value="inactive">Inactive</option></select><button onClick={() => void deactivate(station)} disabled={busy || station.status === "inactive"} className="rounded-lg border border-rose-900 px-3 py-2 text-xs font-semibold text-rose-200 disabled:opacity-40">Deactivate</button></div>
-    </article>)}</div> : <div className="mt-4 rounded-xl border border-[#263640] bg-[#0D1218] p-6 text-sm text-[#84919D]">No active stations found. Create a station above or adjust the search.</div>}
+    </article>)}</div> : <div className="mt-4 rounded-xl border border-[#263640] bg-[#0D1218] p-6 text-sm text-[#84919D]">No stations match the current search. Create a station or adjust the search.</div>}
     {pagination.totalPages > 1 && <div className="mt-5 flex justify-between text-xs text-[#A5B4BC]"><span>Page {page} of {pagination.totalPages}</span><div className="flex gap-2"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded border border-[#303943] px-3 py-2 disabled:opacity-40">Previous</button><button disabled={page >= pagination.totalPages} onClick={() => setPage((value) => value + 1)} className="rounded border border-[#303943] px-3 py-2 disabled:opacity-40">Next</button></div></div>}
   </AdminContent>;
 }

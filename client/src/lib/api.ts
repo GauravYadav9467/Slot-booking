@@ -157,6 +157,14 @@ export function getStations(params: { type?: string; search?: string; page?: num
   return apiRequest<{ stations: Station[]; pagination: Pagination }>(`/stations${query.size ? `?${query}` : ""}`);
 }
 
+export function getAdminStations(token: string, params: { type?: string; search?: string; status?: Station["status"]; page?: number; limit?: number } = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  return apiRequest<{ stations: Station[]; pagination: Pagination }>(`/stations/admin${query.size ? `?${query}` : ""}`, { token });
+}
+
 export function getStation(id: string) {
   return apiRequest<{ station: Station }>(`/stations/${encodeURIComponent(id)}`);
 }

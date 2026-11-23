@@ -36,13 +36,13 @@
 
 **Deliverables:** Authenticated wallet and transaction history APIs, configurable simulated top-ups, booking payment, refunds for successfully paid future bookings cancelled before start, and admin adjustments with mandatory reasons. Every balance and ledger operation uses a MongoDB session transaction on replica set `rs0`; unique references and conditional balance updates provide idempotency and prevent duplicate processing or negative balances. Top-ups are not real payments.
 
-## Milestone 7: Frontend and backend integration — IN PROGRESS
+## Milestone 7: Frontend and backend integration — COMPLETED
 
 **Objective:** Connect the NEXUS ARENA client to the existing authenticated REST APIs while retaining the established home-page design.
 
-**Implemented:** Central API client, environment-based API URL, persistent login and protected routes, registration/login/profile/logout, live station search and type filtering, availability and server quotes, booking creation/payment/history/cancellation, wallet and simulated top-ups, transaction history, and admin booking and active station management screens. New pages use the home page's dark teal, cyan and charcoal visual system. Backend booking validation limits reservations to today and the next two Asia/Kolkata calendar days.
+**Implemented:** Central API client, environment-based API URL, persistent login and protected routes, registration/login/profile/logout, live station search and type filtering, availability and server quotes, booking creation/payment/history/cancellation, wallet and simulated top-ups, transaction history, and admin booking and all-status station management screens. New pages use the home page's dark teal, cyan and charcoal visual system. Backend booking validation limits reservations to today and the next two Asia/Kolkata calendar days.
 
-**Remaining:** Add an admin station listing API that includes every status so maintenance/inactive stations can be rediscovered and reactivated. There is no notifications API or notification screen integration yet.
+Notifications are tracked separately in Milestone 8.
 
 ## Milestone 8: Notifications — PLANNED
 

@@ -10,6 +10,11 @@ async function listStations(req, res) {
   res.status(200).json({ status: "success", data: result });
 }
 
+async function listAdminStations(req, res) {
+  const result = await stationService.listAdminStations(req.stationListQuery);
+  res.status(200).json({ status: "success", data: result });
+}
+
 async function getStation(req, res) {
   const station = await stationService.getStationById(req.params.id);
   res.status(200).json({ status: "success", data: { station } });
@@ -37,6 +42,7 @@ async function deactivateStation(req, res) {
 module.exports = {
   createStation,
   listStations,
+  listAdminStations,
   getStation,
   updateStation,
   updateStationStatus,

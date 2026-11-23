@@ -139,8 +139,16 @@ function validateStationStatus(req, res, next) {
 }
 
 function validateStationList(req, res, next) {
+  return validateStationListQuery(req, next, false);
+}
+
+function validateAdminStationList(req, res, next) {
+  return validateStationListQuery(req, next, true);
+}
+
+function validateStationListQuery(req, next, isAdmin) {
   const query = req.query;
-  const allowed = ["type", "search", "page", "limit"];
+  const allowed = isAdmin ? ["type", "search", "status", "page", "limit"] : ["type", "search", "page", "limit"];
   const errors = [];
   for (const key of Object.keys(query)) {
     if (!allowed.includes(key)) errors.push(`Query parameter '${key}' is not supported.`);
@@ -160,11 +168,17 @@ function validateStationList(req, res, next) {
     } else search = query.search.trim();
   }
 
+  let status;
+  if (isAdmin && query.status !== undefined) {
+    status = typeof query.status === "string" ? query.status.trim().toLowerCase() : "";
+    if (!stationStatuses.includes(status)) errors.push("Status must be active, maintenance, or inactive.");
+  }
+
   const page = parsePositiveInteger(query.page, 1, 1000000, "Page", errors);
   const limit = parsePositiveInteger(query.limit, 20, 100, "Limit", errors);
   if (errors.length) return next(invalid(errors));
 
-  req.stationListQuery = { type, search, page, limit };
+  req.stationListQuery = { type, search, status, page, limit };
   return next();
 }
 
@@ -186,6 +200,7 @@ function parsePositiveInteger(value, defaultValue, maximum, label, errors) {
 module.exports = {
   validateCreateStation,
   validateStationList,
+  validateAdminStationList,
   validateStationId,
   validateUpdateStation,
   validateStationStatus,

@@ -36,7 +36,7 @@ Wallet ledger operations are implemented as local simulations. Simulated top-ups
 
 ### Current client
 
-The client provides registration, login, profile, station detail, booking checkout/history/details, wallet, transaction history, an admin dashboard, active station management, and admin booking views. It uses live backend data and includes loading, empty, success, and error feedback. Top-ups are clearly labeled simulations. The admin station view cannot rediscover inactive or maintenance stations because the backend listing endpoint exposes active stations only.
+The client provides registration, login, profile, station detail, booking checkout/history/details, wallet, transaction history, an admin dashboard, all-status station management, and admin booking views. It uses live backend data and includes loading, empty, success, and error feedback. Top-ups are clearly labeled simulations. Admin station listing includes active, maintenance, and inactive records, while public discovery remains limited to active stations.
 
 ## User roles
 
