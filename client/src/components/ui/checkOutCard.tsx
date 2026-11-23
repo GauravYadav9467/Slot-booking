@@ -3,6 +3,7 @@ import { formatMinor, type Availability, type Station } from "../../lib/api";
 
 type Props = {
   station: Station | null;
+  selectedCount: number;
   date: string;
   time: string;
   duration: number;
@@ -18,7 +19,6 @@ type Props = {
   onTimeChange: (value: string) => void;
   onDurationChange: (value: number) => void;
   onReserve: () => void;
-  savedBookingId: string | null;
 };
 
 const fieldClass = "mt-1 w-full rounded-lg border border-[#303943] bg-[#0D1218] px-3 py-2.5 text-sm text-white outline-none focus:border-[#00E5F5]";
@@ -26,14 +26,14 @@ const fieldClass = "mt-1 w-full rounded-lg border border-[#303943] bg-[#0D1218] 
 export default function CheckOutCard(props: Props) {
   const {
     station, date, time, duration, minDate, maxDate, quote, checking, submitting,
-    walletBalance, signedIn, message, onDateChange, onTimeChange, onDurationChange, onReserve, savedBookingId,
+    walletBalance, signedIn, message, onDateChange, onTimeChange, onDurationChange, onReserve, selectedCount,
   } = props;
 
   return (
     <aside className="w-full rounded-2xl border border-[#164B54] bg-gradient-to-b from-[#191D25] to-[#151A20] p-5 text-[#C5D0D8] shadow-[0_0_20px_rgba(0,229,245,0.08)]">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-bold tracking-widest text-[#00E5F5]">● BOOKING SELECTION</p>
-        <span className="rounded-full border border-[#237E69] bg-[#123C36] px-3 py-1 text-xs font-bold text-[#38E8BA]">{station ? "Ready to check" : "Choose a rig"}</span>
+        <span className="rounded-full border border-[#237E69] bg-[#123C36] px-3 py-1 text-xs font-bold text-[#38E8BA]">{selectedCount ? `${selectedCount} selected` : "Choose a rig"}</span>
       </div>
       <h2 className="text-base font-bold text-white">{station?.name || "Select a gaming station"}</h2>
       <div className="my-4 border-t border-[#303943]" />
@@ -84,8 +84,8 @@ export default function CheckOutCard(props: Props) {
 
       {message && <div className={`mt-4 rounded-lg border px-3 py-2.5 text-xs ${message.kind === "error" ? "border-rose-900 bg-rose-950/50 text-rose-200" : message.kind === "success" ? "border-emerald-800 bg-emerald-950/40 text-emerald-200" : "border-[#285D69] bg-[#103039] text-[#9FEAF0]"}`} role={message.kind === "error" ? "alert" : "status"}>{message.text}</div>}
 
-      <button type="button" onClick={onReserve} disabled={submitting || (savedBookingId ? false : !station || checking || (signedIn && !quote?.available))} className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#00E5F5] py-3.5 text-sm font-extrabold text-[#061519] shadow-[0_0_16px_rgba(0,229,245,0.25)] transition hover:bg-[#39F3FF] disabled:cursor-not-allowed disabled:opacity-45">
-        {submitting ? "Securing session…" : savedBookingId ? "Review saved booking" : signedIn ? "Reserve & pay with wallet" : "Sign in to reserve"}
+      <button type="button" onClick={onReserve} disabled={submitting || selectedCount === 0} className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#00E5F5] py-3.5 text-sm font-extrabold text-[#061519] shadow-[0_0_16px_rgba(0,229,245,0.25)] transition hover:bg-[#39F3FF] disabled:cursor-not-allowed disabled:opacity-45">
+        {submitting ? "Opening checkout…" : signedIn ? `Continue to Checkout (${selectedCount})` : `Review selection (${selectedCount})`}
       </button>
       <p className="mt-4 flex items-center justify-center gap-2 text-center text-[10px] font-medium text-[#38B98F]">● No payment is taken until the booking is confirmed and paid from your wallet.</p>
     </aside>

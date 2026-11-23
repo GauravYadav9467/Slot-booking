@@ -10,6 +10,7 @@ import {
 } from "../pages/UserPages";
 import { AdminBookingsPage, AdminDashboardPage, AdminStationsPage } from "../pages/AdminPages";
 import { NotificationHistoryPage } from "../pages/NotificationPages";
+import BookingCartCheckoutPage from "../pages/BookingCartCheckoutPage";
 
 function ProtectedArea({ admin = false }: { admin?: boolean }) {
   const { user, token, loading, sessionError, refreshProfile, logout } = useAuth();
@@ -34,6 +35,7 @@ export default function AppRoutes() {
       <Route path="/register" element={<RegistrationPage />} />
       <Route path="/stations/:id" element={<StationDetailsPage />} />
       <Route path="/stations/:id/book" element={<BookingCheckoutPage />} />
+      <Route path="/checkout" element={<BookingCartCheckoutPage />} />
       <Route element={<ProtectedArea />}>
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/myBookings" element={<MyBookingsPage />} />

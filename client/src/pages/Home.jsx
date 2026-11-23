@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Card from "../components/ui/exploreCard";
 import CheckOutCard from "../components/ui/checkOutCard";
+import BookingSelectionFooter from "../components/ui/BookingSelectionFooter";
 import Footer from "../components/layout/footer";
 import Navbar from "../components/layout/Navbar";
 import { useAuth } from "../context/AuthContext";
-import { ApiError, createBooking, getAvailability, getErrorMessage, getStations, getWallet, payBooking } from "../lib/api";
+import { useBookingSelection } from "../context/BookingSelectionContext";
+import { getAvailability, getErrorMessage, getStations, getWallet } from "../lib/api";
 import { bookingWindow, defaultKolkataSession, kolkataDateOffset } from "../lib/bookingTime";
 
 export default function Home() {
   const { user, token } = useAuth();
+  const { selectedStations, selectedStationIds, toggleStation } = useBookingSelection();
   const navigate = useNavigate();
   const location = useLocation();
   const initialSession = useMemo(() => defaultKolkataSession(), []);
@@ -19,7 +22,7 @@ export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [type, setType] = useState("");
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState(null);
+  const [focusedStationId, setFocusedStationId] = useState(null);
   const [date, setDate] = useState(initialSession.date);
   const [time, setTime] = useState(initialSession.time);
   const [duration, setDuration] = useState(120);
@@ -27,11 +30,9 @@ export default function Home() {
   const [walletBalance, setWalletBalance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState(null);
-  const [savedBookingId, setSavedBookingId] = useState(null);
-  const station = stations.find((item) => item.id === selectedId) || null;
+  const station = stations.find((item) => item.id === focusedStationId) || selectedStations.find((item) => item.id === focusedStationId) || null;
 
   useEffect(() => {
     let active = true;
@@ -41,13 +42,19 @@ export default function Home() {
         if (!active) return;
         setStations(result.stations);
         setPagination(result.pagination);
-        setSelectedId((current) => result.stations.some((item) => item.id === current) ? current : result.stations[0]?.id || null);
         setError("");
       })
       .catch((requestError) => { if (active) setError(getErrorMessage(requestError, "Could not load stations.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [type, search, page, refreshKey]);
+
+  useEffect(() => {
+    if (!focusedStationId && selectedStations.length) setFocusedStationId(selectedStations.at(-1).id);
+    if (focusedStationId && !selectedStationIds.includes(focusedStationId)) {
+      setFocusedStationId(selectedStationIds.at(-1) || null);
+    }
+  }, [focusedStationId, selectedStationIds, selectedStations]);
 
   useEffect(() => {
     if (!token) {
@@ -86,45 +93,15 @@ export default function Home() {
     return () => { active = false; globalThis.clearTimeout(timer); };
   }, [station?.id, date, time, duration]);
 
-  async function reserve() {
-    if (savedBookingId) {
-      navigate(`/bookings/${savedBookingId}`);
-      return;
-    }
-    if (!user || !token) {
-      navigate("/login", { state: { from: location.pathname } });
-      return;
-    }
-    if (!station || !quote?.available) return;
-    const slot = bookingWindow(date, time, duration);
-    if (!slot) return;
-    setSubmitting(true);
-    setMessage(null);
-    try {
-      const result = await createBooking(token, { stationId: station.id, ...slot });
-      setSavedBookingId(result.booking.id);
-      try {
-        await payBooking(token, result.booking.id);
-        window.dispatchEvent(new Event("nexus-notifications-refresh"));
-        navigate(`/bookings/${result.booking.id}`, { state: { notice: "Your station is reserved and paid from your wallet." } });
-      } catch (paymentError) {
-        const detail = paymentError instanceof ApiError && paymentError.status === 409
-          ? "Your booking is saved as pending. Add funds in Wallet, then return to My Bookings to pay."
-          : `Your booking is saved, but wallet payment did not finish: ${getErrorMessage(paymentError)}`;
-        setMessage({ kind: "error", text: detail });
-      }
-    } catch (requestError) {
-      setMessage({ kind: "error", text: getErrorMessage(requestError, "The booking could not be created.") });
-    } finally {
-      setSubmitting(false);
-    }
+  function reserve() {
+    navigate("/checkout");
   }
 
   return (
     <>
       <Navbar />
       <div className="min-h-screen w-full bg-[#0F2128]">
-        <main className="home mx-auto flex min-h-screen w-full max-w-[1600px] flex-col p-5 text-white sm:px-8 lg:max-w-[85%]">
+        <main className={`home mx-auto flex min-h-screen w-full max-w-[1600px] flex-col p-5 text-white sm:px-8 lg:max-w-[85%] ${selectedStations.length ? "pb-44 sm:pb-36" : ""}`}>
           <h1 className="text-3xl font-bold sm:text-4xl">Reserve Your<span className="ml-3 text-[#00F0FF]">Battle Station</span></h1>
           <h2 className="mt-3 max-w-3xl text-base leading-7 text-[#C5D0D8] sm:text-lg">Find a ready gaming station, choose a session for today or the next two days, and review its live price before reserving.</h2>
 
@@ -144,7 +121,7 @@ export default function Home() {
               {loading ? <div className="rounded-xl border border-[#164B54] bg-[#151A20] p-8 text-sm text-[#A5B4BC]" role="status">Loading available stations…</div> : null}
               {!loading && error ? <div className="rounded-xl border border-rose-900 bg-rose-950/50 p-4 text-sm text-rose-200" role="alert">{error}<button onClick={() => setRefreshKey((value) => value + 1)} className="ml-3 underline">Retry</button></div> : null}
               {!loading && !error && stations.length === 0 ? <div className="rounded-xl border border-[#164B54] bg-[#151A20] p-8 text-sm text-[#A5B4BC]">No active stations match these filters. Try another search or type.</div> : null}
-              {!loading && stations.length > 0 ? <div className="flex flex-wrap items-start content-start gap-5">{stations.map((item) => <Card key={item.id} station={item} selected={item.id === selectedId} onSelect={(value) => { setSelectedId(value.id); setQuote(null); setMessage(null); }} />)}</div> : null}
+              {!loading && stations.length > 0 ? <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2">{stations.map((item) => <Card key={item.id} station={item} selected={selectedStationIds.includes(item.id)} onSelect={(value) => { const wasSelected = selectedStationIds.includes(value.id); toggleStation(value); setFocusedStationId(wasSelected ? selectedStationIds.filter((id) => id !== value.id).at(-1) || null : value.id); setQuote(null); setMessage(null); }} />)}</div> : null}
 
               {pagination.totalPages > 1 && <div className="mt-5 flex items-center justify-between rounded-xl border border-[#232F37] bg-[#151A20] px-4 py-3 text-xs text-[#A5B4BC]">
                 <span>Page {pagination.page} of {pagination.totalPages} · {pagination.total} stations</span>
@@ -156,6 +133,7 @@ export default function Home() {
               <div className="sticky top-[72px] mx-auto max-w-[520px] lg:max-w-[380px]">
                 <CheckOutCard
                   station={station}
+                  selectedCount={selectedStations.length}
                   date={date}
                   time={time}
                   duration={duration}
@@ -163,23 +141,22 @@ export default function Home() {
                   maxDate={kolkataDateOffset(2)}
                   quote={quote}
                   checking={checking}
-                  submitting={submitting}
+                  submitting={false}
                   walletBalance={walletBalance}
                   signedIn={Boolean(user)}
                   message={message}
-                  savedBookingId={savedBookingId}
                   onDateChange={(value) => { setDate(value); setQuote(null); }}
                   onTimeChange={(value) => { setTime(value); setQuote(null); }}
                   onDurationChange={(value) => { setDuration(value); setQuote(null); }}
                   onReserve={reserve}
                 />
-                {savedBookingId && <p className="mt-2 text-center text-xs text-[#A5B4BC]">A pending booking has been saved. <Link className="text-[#4DDCE9] underline" to="/wallet">Add wallet funds</Link> before paying.</p>}
               </div>
             </div>
           </div>
         </main>
         <Footer />
       </div>
+      <BookingSelectionFooter />
     </>
   );
 }
