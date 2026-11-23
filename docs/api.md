@@ -17,6 +17,8 @@ Base URL: `http://localhost:5000/api/v1`. JSON endpoints use `{ "status": "succe
 | GET | `/auth/me` | Bearer token | Any active user |
 | POST | `/auth/logout` | Bearer token | Expiry-based client logout response |
 
+The login and registration endpoints apply configurable per-IP request limits (`AUTH_RATE_LIMIT_WINDOW_MS`, default 900,000; `AUTH_RATE_LIMIT_MAX`, default 10 per route and window). Rate-limited requests receive HTTP 429. The current limiter uses process memory and is intended for a single local/API process; multi-instance hosting needs a shared store.
+
 Register request:
 
 ```json
@@ -220,6 +222,7 @@ Booking creation and its admin notification share a MongoDB transaction. Top-up,
 | 404 | Station or booking does not exist; a user does not own the booking |
 | 409 | Duplicate/conflicting booking or idempotency key, unavailable station, active reservation lease, insufficient balance, or ineligible payment/cancellation |
 | 422 | Price exceeds supported integer limits |
+| 429 | Per-IP login or registration request limit reached |
 | 500 | Unexpected server error; internal database details are not returned |
 
 ## Client integration

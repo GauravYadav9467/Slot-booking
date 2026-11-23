@@ -35,6 +35,16 @@ flowchart LR
 
 The client API layer reads `VITE_API_BASE_URL` and defaults to `http://localhost:5000/api/v1`. It sends bearer tokens for protected requests, normalizes API errors, and clears expired sessions on authentication failures. User and admin route guards rely on the loaded profile role; the backend remains authoritative for access control.
 
+## Startup and request protection
+
+The API connects to MongoDB before listening; a failed database connection aborts startup without logging the connection URI or error details. CORS allows configured `CLIENT_ORIGIN` values and, when not in production, the Vite loopback origins. Login and registration use configurable per-IP rate limits. The current limiter uses the process-local memory store, so a horizontally scaled deployment should use a shared store.
+
+The local demo seeder uses the `Station` model, insert-only station-code upserts, local-host and database checks, and requires writable replica set `rs0`. Optional demo accounts are created only when configured, with their user and wallet inserted in one session transaction. Existing user records are not promoted or changed.
+
+## Deployment boundary
+
+The project includes no cloud provider integration or deployment configuration. For a future release, build `client/dist`, run the API with `npm start`, inject secrets using the host's secret manager, set `NODE_ENV=production` and an explicit `CLIENT_ORIGIN`, and use a restricted TLS MongoDB replica-set connection. Backups should be encrypted, access-controlled and restore-tested. These are documented operating steps, not a deployment that has been performed.
+
 ## Authentication flow
 
 Registration normalizes the email, hashes the password, creates a user with the `user` role, and creates the user's wallet. Login verifies the hash and returns an HS256 JWT with the configured expiry. Protected requests require a bearer token; middleware verifies it, loads the current user, rejects blocked accounts or changed roles, and sets the authenticated user ID and role for downstream handlers.

@@ -69,3 +69,15 @@ Run backend integration checks from `server/` with `npm test`. These tests requi
 - [Database models](docs/database.md)
 - [REST API reference](docs/api.md)
 - [Development setup and troubleshooting](docs/development.md)
+
+## Local demonstration
+
+Start MongoDB as a local single-node replica set named `rs0`, then start the API and client using the commands above. In the server terminal, run `npm run seed:demo` from `server/` to add 16 NEXUS ARENA gaming stations to the local `nexus_arena` database. The command is repeatable, only inserts missing station codes, refuses non-local databases and production mode, and does not delete or update existing records. It creates 12 active, two maintenance, and two inactive stations. Public discovery shows active stations; the admin station page can show all three statuses.
+
+With the default ports, open the frontend at `http://localhost:5173`, the API at `http://localhost:5000`, and public station results at `http://localhost:5000/api/v1/stations`. In MongoDB Compass, connect to your configured local MongoDB instance, select `nexus_arena`, then open the `stations` collection. See [the development guide](docs/development.md) for optional local demo accounts, admin access, verification steps and deployment preparation.
+
+The seed command can also create local demo accounts. Set `DEMO_ADMIN_NAME`, `DEMO_ADMIN_EMAIL`, and `DEMO_ADMIN_PASSWORD` in the ignored `server/.env` before running it; optionally set the matching `DEMO_USER_*` values. Choose a new email address. Existing accounts are left unchanged and are never promoted by the seed. These accounts are local presentation accounts only; use unique credentials and never reuse them in a deployed environment.
+
+## Final verification
+
+The current backend integration suite reports 35 passing tests against the configured writable `rs0` replica set. Model index verification passes for all seven active schemas, JavaScript syntax checks pass, the frontend TypeScript production build passes, and both dependency audits report no vulnerabilities. Lint exits successfully with existing React warnings, and the Vite config reports a non-blocking `__dirname` compatibility warning. Browser-based manual testing was not performed because no browser automation tool is available in this environment. Deployment has not been performed.

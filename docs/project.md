@@ -34,6 +34,7 @@ Wallet ledger operations are implemented as local simulations. Simulated top-ups
 - Session-backed simulated wallet top-ups, booking payment deductions, eligible cancellation refunds, and administrator adjustments.
 - Idempotency references and transaction-backed balance changes to prevent duplicate credits, charges, and refunds.
 - User-scoped notification history and unread state for booking, payment, top-up and refund events; booking and financial notifications commit atomically with their associated operations.
+- A repeatable local-only demo seed for stations and optional create-only demo accounts, plus backend index verification and an expanded authentication integration suite.
 
 ### Current client
 
@@ -69,11 +70,14 @@ Public registration always assigns the `user` role. There is no public admin-reg
 11. The system retains cancelled bookings and transaction records for history.
 12. Users can review, filter, and mark their in-app notifications as read; administrators can review booking operations.
 
-Broader frontend automated tests and deployment work remain for Milestone 9.
+No frontend automated test runner is configured, and browser-based manual testing remains outstanding. Future deployment is documented as preparation guidance only.
+
+The current backend integration suite covers authentication, booking rules and concurrency, station administration, wallet ledger integrity, and notification ownership. The final local verification run passed 35 backend integration tests against replica set `rs0`, confirmed all indexes declared by the seven active models, passed JavaScript syntax checks and the frontend TypeScript/Vite build, and reported zero npm audit vulnerabilities in both applications. Lint exited successfully with existing React warnings. The production build emits a non-blocking Vite `__dirname` compatibility warning. No frontend automated test runner is configured, and browser testing was not performed because no browser automation tool was available. Deployment instructions are preparation guidance only; no hosting target has been configured or deployed.
 
 ## Non-functional requirements
 
 - Validate request data and return consistent HTTP errors.
+- Apply per-IP rate limits to login and registration; the current counters are in-process and need a shared store for multi-instance hosting.
 - Do not expose password hashes or trust client-supplied user IDs or prices.
 - Keep secrets in ignored environment files, not in source control.
 - Store timestamps as UTC dates; accept explicit ISO 8601 offsets at the API boundary.
@@ -81,3 +85,9 @@ Broader frontend automated tests and deployment work remain for Milestone 9.
 - Require unique idempotency references and conditional balance updates to prevent duplicate processing and negative balances.
 - Use indexes for ownership, station time conflicts, unique identifiers, and reservation locks.
 - Keep API modules small and separated into routes, controllers, services, models, and validators.
+
+## Demo and deployment readiness
+
+`npm run seed:demo` from `server/` inserts 16 local `nexus_arena` gaming stations without overwriting records. The script only accepts a local MongoDB host and writable `rs0` primary, is disabled in production, and can optionally create new local demo accounts from ignored environment variables. Active stations are returned by public discovery; maintenance and inactive records remain visible to authenticated administrators. See [development setup](development.md) for commands and access URLs.
+
+The service requires replica-set support for booking creation and wallet operations. Production use additionally requires a TLS-protected MongoDB replica set, secure provider-managed secrets, an exact production browser origin in `CLIENT_ORIGIN`, HTTPS, host-level monitoring and tested backups. Security hardening and deployment readiness do not mean that the application has been deployed or externally penetration-tested.

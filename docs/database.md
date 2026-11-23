@@ -109,3 +109,7 @@ The unique `stationId` index makes acquisition atomic. A holder releases only it
 ## Financial integrity
 
 All balance changes, transaction inserts, booking payment/refund state changes, and their notifications run in one MongoDB session transaction on replica set `rs0`. The wallet update uses a conditional balance predicate to prevent negative balances and integer overflow. If a ledger or notification insert or booking update fails, the transaction aborts. Unique transaction references and booking `paymentStatus` prevent duplicate charges and refunds. No non-transactional financial fallback is performed when transactions are unavailable.
+
+Registration also inserts the new user and its initial wallet in one MongoDB transaction, so either both records are created or neither is committed. Local demo account creation follows the same transactional pattern. The repeatable station seed is insert-only and keyed by unique station code; it never deletes or overwrites existing records.
+
+Run `npm run verify:indexes` from `server/` to compare declared model indexes with the indexes present in the configured database. The command is read-only and reports missing indexes rather than creating or repairing them. It checks User, Station, Booking, Wallet, Transaction, Notification and StationReservationLock; the empty legacy `Payment.js` file does not export a model and is not part of the active schema.
