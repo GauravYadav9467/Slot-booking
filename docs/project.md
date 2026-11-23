@@ -42,6 +42,10 @@ The client provides registration, login, profile, station detail, booking checko
 
 ## User roles
 
+### Owner control panel and walk-in booking
+
+The admin area provides a responsive owner dashboard, station inventory across all statuses, a daily slot schedule, filtered booking management, walk-in booking, customer lookup with wallet balance review, transaction history and admin notifications. Walk-ins are associated with an existing active registered customer. The API recalculates price and checks station status, date, overlap and reservation locks on the server. Walk-ins remain `pending` and `unpaid`; they do not charge the customer's wallet or record cash collection. The UI presents this payment limitation clearly.
+
 - **User:** register, log in, view stations, create bookings, view their own bookings, and cancel eligible bookings.
 - **Admin:** use the user capabilities and manage stations or view and manage all bookings.
 

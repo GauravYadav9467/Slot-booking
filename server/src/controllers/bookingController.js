@@ -6,11 +6,21 @@ async function checkAvailability(req, res) {
   res.status(200).json({ status: "success", data: result });
 }
 
+async function getAdminAvailability(req, res) {
+  const result = await bookingService.getAdminAvailability(req.adminAvailabilityQuery);
+  res.status(200).json({ status: "success", data: result });
+}
+
 async function createBooking(req, res) {
   const booking = await bookingService.createBooking({
     ...req.bookingInput,
     userId: req.auth.userId,
   });
+  res.status(201).json({ status: "success", data: { booking } });
+}
+
+async function createWalkInBooking(req, res) {
+  const booking = await bookingService.createBooking({ ...req.walkInInput, actorRole: "admin" });
   res.status(201).json({ status: "success", data: { booking } });
 }
 
@@ -45,7 +55,9 @@ async function payBooking(req, res) {
 
 module.exports = {
   checkAvailability,
+  getAdminAvailability,
   createBooking,
+  createWalkInBooking,
   getMyBookings,
   getBooking,
   cancelBooking,

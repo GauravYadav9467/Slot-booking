@@ -11,6 +11,7 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       enum: [
         "booking_confirmed",
+        "booking_pending",
         "payment_success",
         "booking_cancelled",
         "booking_refund",

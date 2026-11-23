@@ -7,6 +7,7 @@ const {
   validateWalletQuery,
   validateTopUp,
   validateTransactionList,
+  validateAdminTransactionList,
   validateAdjustment,
 } = require("../validators/walletValidator");
 
@@ -15,6 +16,7 @@ const router = express.Router();
 router.use(authenticate);
 router.get("/", validateWalletQuery, walletController.getWallet);
 router.get("/transactions", validateTransactionList, walletController.getTransactions);
+router.get("/admin/transactions", requireAdmin, validateAdminTransactionList, walletController.getAdminTransactions);
 router.post("/top-up", validateIdempotencyKey, validateTopUp, walletController.topUp);
 router.post("/admin/adjustments", requireAdmin, validateIdempotencyKey, validateAdjustment, walletController.adjustWallet);
 

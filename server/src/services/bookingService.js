@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
 const Notification = require("../models/Notification");
 const Station = require("../models/Station");
+const User = require("../models/User");
+const Wallet = require("../models/Wallet");
 const StationReservationLock = require("../models/StationReservationLock");
 const walletService = require("./walletService");
 const notificationService = require("./notificationService");
@@ -186,8 +188,13 @@ async function checkAvailability({ stationId, startAt, endAt, durationMinutes })
   return { ...response, available: true, reason: null, message: "The station is available for this time." };
 }
 
-async function createBooking({ stationId, startAt, endAt, durationMinutes, userId }) {
+async function createBooking({ stationId, startAt, endAt, durationMinutes, userId, actorRole = "user" }) {
   if (startAt <= new Date()) throw createError("startAt must be in the future.", 400);
+  if (actorRole === "admin") {
+    const customer = await User.findOne({ _id: userId, role: "user" }).select("status").lean();
+    if (!customer) throw createError("Registered customer not found.", 404);
+    if (customer.status !== "active") throw createError("This customer account is blocked.", 403);
+  }
 
   const token = await acquireStationLock(stationId);
   try {
@@ -228,6 +235,17 @@ async function createBooking({ stationId, startAt, endAt, durationMinutes, userI
           relatedBookingId: bookingId,
           session,
         });
+        if (actorRole === "admin") {
+          await notificationService.createForUser({
+            userId,
+            eventKey: `walk-in-booking:${bookingId}`,
+            type: "booking_pending",
+            title: "Walk-in booking created",
+            message: "A lounge staff member created your session. Payment is pending.",
+            relatedBookingId: bookingId,
+            session,
+          });
+        }
         result = safeBooking(booking);
       }, {
         readPreference: "primary",
@@ -298,6 +316,21 @@ function adminBookingFilter({ status, stationId, from, to }) {
 
 async function getAdminBookings(query) {
   const filter = adminBookingFilter(query);
+  if (query.paymentStatus) filter.paymentStatus = query.paymentStatus;
+  if (query.search) {
+    const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const matchingUsers = await User.find({
+      role: "user",
+      $or: [
+        { name: { $regex: escaped, $options: "i" } },
+        { email: { $regex: escaped, $options: "i" } },
+        { phone: { $regex: escaped, $options: "i" } },
+      ],
+    }).select("_id").limit(250).lean();
+    const searchFilters = [{ userId: { $in: matchingUsers.map((user) => user._id) } }];
+    if (mongoose.isObjectIdOrHexString(query.search)) searchFilters.push({ _id: query.search });
+    filter.$or = searchFilters;
+  }
   const [bookings, total] = await Promise.all([
     Booking.find(filter)
       .populate("stationId", stationFields)
@@ -315,6 +348,104 @@ async function getAdminBookings(query) {
   };
 }
 
+function localDayRange(date) {
+  const startAt = new Date(`${date}T00:00:00+05:30`);
+  const endAt = new Date(startAt.getTime() + 24 * 60 * 60 * 1000);
+  return { startAt, endAt };
+}
+
+async function getAdminAvailability({ date, durationMinutes }) {
+  const { startAt: dayStart, endAt: dayEnd } = localDayRange(date);
+  const [stations, bookings, locks, cancelled] = await Promise.all([
+    Station.find().select("name code type status hourlyRateMinor currency").sort({ name: 1, _id: 1 }).lean(),
+    Booking.find({ status: { $in: activeStatuses }, startAt: { $lt: dayEnd }, endAt: { $gt: dayStart } })
+      .select("userId stationId startAt endAt status paymentStatus").populate("userId", "name email phone").lean(),
+    StationReservationLock.find({ expiresAt: { $gt: new Date() } }).select("stationId").lean(),
+    Booking.find({ status: "cancelled", startAt: { $lt: dayEnd }, endAt: { $gt: dayStart } })
+      .select("userId stationId startAt endAt status paymentStatus cancellationReason").populate("userId", "name email phone")
+      .populate("stationId", "name code").sort({ startAt: 1 }).limit(250).lean(),
+  ]);
+  const lockedStations = new Set(locks.map((lock) => lock.stationId.toString()));
+  const byStation = new Map();
+  for (const booking of bookings) {
+    const key = booking.stationId.toString();
+    if (!byStation.has(key)) byStation.set(key, []);
+    byStation.get(key).push(booking);
+  }
+  const now = Date.now();
+  const slots = Array.from({ length: 48 }, (_, index) => {
+    const totalMinutes = index * 30;
+    const time = `${String(Math.floor(totalMinutes / 60)).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`;
+    const slotStart = new Date(`${date}T${time}:00+05:30`);
+    return { time, startAt: slotStart, endAt: new Date(slotStart.getTime() + durationMinutes * 60000) };
+  });
+  const resultStations = stations.map((station) => {
+    const stationBookings = byStation.get(station._id.toString()) || [];
+    const isLocked = lockedStations.has(station._id.toString());
+    return {
+      id: station._id.toString(), name: station.name, code: station.code, type: station.type,
+      status: station.status, hourlyRateMinor: station.hourlyRateMinor, currency: station.currency,
+      slots: slots.map((slot) => {
+        const conflict = stationBookings.find((booking) => booking.startAt < slot.endAt && booking.endAt > slot.startAt);
+        const reason = conflict ? "booked"
+          : station.status !== "active" ? "station_unavailable"
+          : slot.startAt.getTime() <= now ? "past_time"
+          : isLocked ? "reservation_in_progress" : null;
+        return {
+          time: slot.time,
+          startAt: slot.startAt.toISOString(),
+          endAt: slot.endAt.toISOString(),
+          available: reason === null,
+          reason,
+          ...(conflict ? { booking: {
+            id: conflict._id.toString(), status: conflict.status, paymentStatus: conflict.paymentStatus || "unpaid",
+            startAt: conflict.startAt.toISOString(), endAt: conflict.endAt.toISOString(),
+            customer: conflict.userId ? { id: conflict.userId._id.toString(), name: conflict.userId.name, email: conflict.userId.email, phone: conflict.userId.phone } : null,
+          } } : {}),
+        };
+      }),
+    };
+  });
+  return {
+    date,
+    timeZone: "Asia/Kolkata",
+    durationMinutes,
+    stations: resultStations,
+    cancelledBookings: cancelled.map((booking) => ({
+      id: booking._id.toString(), stationId: booking.stationId?._id.toString(),
+      station: booking.stationId?.name || booking.stationId?.code || "Station",
+      startAt: booking.startAt.toISOString(), endAt: booking.endAt.toISOString(),
+      paymentStatus: booking.paymentStatus || "unpaid", cancellationReason: booking.cancellationReason || "",
+      customer: booking.userId ? { id: booking.userId._id.toString(), name: booking.userId.name, email: booking.userId.email, phone: booking.userId.phone } : null,
+    })),
+  };
+}
+
+async function listCustomers({ search, status, page, limit }) {
+  const filter = { role: "user" };
+  if (status) filter.status = status;
+  if (search) {
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    filter.$or = ["name", "email", "phone"].map((field) => ({ [field]: { $regex: escaped, $options: "i" } }));
+  }
+  const [users, total] = await Promise.all([
+    User.find(filter).select("name email phone status createdAt").sort({ name: 1, _id: 1 }).skip((page - 1) * limit).limit(limit).lean(),
+    User.countDocuments(filter),
+  ]);
+  return {
+    customers: users.map((user) => ({ id: user._id.toString(), name: user.name, email: user.email, phone: user.phone || "", status: user.status, createdAt: user.createdAt.toISOString() })),
+    pagination: paginationResult(page, limit, total),
+  };
+}
+
+async function getCustomerWallet(userId) {
+  const customer = await User.findOne({ _id: userId, role: "user" }).select("_id").lean();
+  if (!customer) throw createError("Registered customer not found.", 404);
+  const wallet = await Wallet.findOne({ userId }).select("balanceMinor currency status updatedAt").lean();
+  if (!wallet) throw createError("Wallet not found.", 404);
+  return { id: wallet._id.toString(), balanceMinor: wallet.balanceMinor, currency: wallet.currency, status: wallet.status, updatedAt: wallet.updatedAt.toISOString() };
+}
+
 module.exports = {
   checkAvailability,
   createBooking,
@@ -322,4 +453,7 @@ module.exports = {
   getBookingById,
   cancelBooking,
   getAdminBookings,
+  getAdminAvailability,
+  listCustomers,
+  getCustomerWallet,
 };

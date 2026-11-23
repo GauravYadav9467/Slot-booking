@@ -61,3 +61,11 @@ Notifications are tracked separately in Milestone 8.
 **Verification limits:** The backend integration suite and configured MongoDB replica set are verified locally. Frontend production build, TypeScript checks, lint and syntax checks are recorded in the milestone report. No browser automation or manual browser review was performed, no deployment was carried out, and multi-instance rate limiting still needs a shared store before horizontal scaling.
 
 **Recorded local checks:** 35 backend integration tests passed; all declared indexes for the seven active schemas were found; JavaScript syntax checks passed; `npm audit` found zero vulnerabilities in both applications; the frontend TypeScript/Vite production build passed; and `git diff --check` passed. Lint exited successfully with existing warnings. Browser testing was unavailable in the execution environment.
+
+## Milestone 10: Owner admin control panel and walk-in bookings — IMPLEMENTED
+
+**Objective:** Complete the owner's operational workflow without changing customer payment or booking integrity rules.
+
+**Implemented:** Responsive `/admin` navigation and dashboard; daily availability calendar across active, maintenance and inactive stations; customer and booking search/filtering; customer wallet balance and admin transaction review; and walk-in booking for existing active registered customers. New admin endpoints provide calendar data and customer/wallet lookup; existing booking and station services remain the source of truth. Walk-in creation runs through the normal station reservation lease and booking transaction, uses backend price and overlap checks, and creates a pending, unpaid booking without a wallet debit or cash receipt record.
+
+**Verification:** Owner APIs, schedule, customer safety, unpaid walk-in creation and conflicts are covered by `server/tests/admin-control.integration.test.js`. The full backend integration suite currently reports 40 passing and one time-dependent skip. Frontend checks and Git validation are recorded in the milestone change report. Browser testing is only reported if actually performed.

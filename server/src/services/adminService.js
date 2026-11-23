@@ -1,13 +1,21 @@
 const Booking = require("../models/Booking");
 const Station = require("../models/Station");
 const notificationService = require("./notificationService");
+const bookingService = require("./bookingService");
 
 const bookingStatuses = ["pending", "confirmed", "cancelled", "completed", "no_show"];
 
 async function getOverview(adminUserId) {
-  const [stationGroups, bookingGroups, recentBookings, recentNotifications] = await Promise.all([
+  const now = new Date();
+  const localParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const localDate = Object.fromEntries(localParts.map((part) => [part.type, part.value]));
+  const localDayStart = new Date(`${localDate.year}-${localDate.month}-${localDate.day}T00:00:00+05:30`);
+  const nextDayStart = new Date(localDayStart.getTime() + 24 * 60 * 60 * 1000);
+  const [stationGroups, bookingGroups, todayBookings, upcomingBookings, recentBookings, recentNotifications] = await Promise.all([
     Station.aggregate([{ $group: { _id: "$status", total: { $sum: 1 } } }]),
     Booking.aggregate([{ $group: { _id: "$status", total: { $sum: 1 } } }]),
+    Booking.countDocuments({ startAt: { $gte: localDayStart, $lt: nextDayStart } }),
+    Booking.countDocuments({ status: { $in: ["pending", "confirmed"] }, startAt: { $gte: now } }),
     Booking.find()
       .select("userId stationId startAt endAt status paymentStatus createdAt")
       .populate("userId", "name")
@@ -24,8 +32,8 @@ async function getOverview(adminUserId) {
   for (const group of bookingGroups) if (Object.hasOwn(bookingCounts, group._id)) bookingCounts[group._id] = group.total;
 
   return {
-    stations: stationCounts,
-    bookings: { ...bookingCounts, total: Object.values(bookingCounts).reduce((sum, count) => sum + count, 0) },
+    stations: { ...stationCounts, total: Object.values(stationCounts).reduce((sum, count) => sum + count, 0) },
+    bookings: { ...bookingCounts, total: Object.values(bookingCounts).reduce((sum, count) => sum + count, 0), today: todayBookings, upcoming: upcomingBookings },
     recentBookings: recentBookings.map((booking) => ({
       id: booking._id.toString(),
       user: booking.userId?.name || "Customer",
@@ -38,4 +46,12 @@ async function getOverview(adminUserId) {
   };
 }
 
-module.exports = { getOverview };
+function listCustomers(query) {
+  return bookingService.listCustomers(query);
+}
+
+function getCustomerWallet(userId) {
+  return bookingService.getCustomerWallet(userId);
+}
+
+module.exports = { getOverview, listCustomers, getCustomerWallet };

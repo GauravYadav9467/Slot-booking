@@ -63,11 +63,23 @@ export type Notification = {
   createdAt: string;
 };
 export type AdminOverview = {
-  stations: { active: number; maintenance: number; inactive: number };
-  bookings: { total: number; pending: number; confirmed: number; cancelled: number; completed: number; no_show: number };
+  stations: { total: number; active: number; maintenance: number; inactive: number };
+  bookings: { total: number; today: number; upcoming: number; pending: number; confirmed: number; cancelled: number; completed: number; no_show: number };
   recentBookings: Array<{ id: string; user: string; station: string; startAt: string; status: Booking["status"]; paymentStatus: Booking["paymentStatus"] }>;
   recentNotifications: Notification[];
 };
+export type AdminCustomer = Pick<User, "id" | "name" | "email" | "phone" | "status"> & { createdAt: string };
+export type AdminScheduleSlot = {
+  time: string;
+  startAt: string;
+  endAt: string;
+  available: boolean;
+  reason: "station_unavailable" | "past_time" | "reservation_in_progress" | "booked" | null;
+  booking?: { id: string; status: Booking["status"]; paymentStatus: Booking["paymentStatus"]; startAt: string; endAt: string; customer: Pick<User, "id" | "name" | "email" | "phone"> | null };
+};
+export type AdminScheduleStation = Pick<Station, "id" | "name" | "code" | "type" | "status" | "hourlyRateMinor" | "currency"> & { slots: AdminScheduleSlot[] };
+export type AdminSchedule = { date: string; timeZone: string; durationMinutes: number; stations: AdminScheduleStation[]; cancelledBookings: Array<{ id: string; stationId: string; station: string; startAt: string; endAt: string; paymentStatus: Booking["paymentStatus"]; cancellationReason: string; customer: Pick<User, "id" | "name" | "email" | "phone"> | null }> };
+export type AdminTransaction = Transaction & { customer: Pick<User, "id" | "name" | "email" | "phone"> | null };
 export type Pagination = { page: number; limit: number; total: number; totalPages: number };
 export type Page<T> = { [key: string]: T[] | Pagination };
 export type Availability = {
@@ -232,10 +244,35 @@ export function payBooking(token: string, id: string) {
   );
 }
 
-export function getAdminBookings(token: string, params: { status?: string; stationId?: string; from?: string; to?: string; page?: number; limit?: number } = {}) {
+export function getAdminBookings(token: string, params: { status?: string; paymentStatus?: string; search?: string; stationId?: string; from?: string; to?: string; page?: number; limit?: number } = {}) {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => { if (value) query.set(key, String(value)); });
   return apiRequest<{ bookings: Booking[]; pagination: Pagination }>(`/bookings/admin${query.size ? `?${query}` : ""}`, { token });
+}
+
+export function getAdminAvailability(token: string, params: { date: string; durationMinutes: number }) {
+  const query = new URLSearchParams({ date: params.date, durationMinutes: String(params.durationMinutes) });
+  return apiRequest<AdminSchedule>(`/bookings/admin/availability?${query}`, { token });
+}
+
+export function createWalkInBooking(token: string, body: { userId: string; stationId: string; startAt: string; endAt: string }) {
+  return apiRequest<{ booking: Booking }>("/bookings/admin/walk-in", { method: "POST", token, body });
+}
+
+export function getAdminCustomers(token: string, params: { search?: string; status?: User["status"]; page?: number; limit?: number } = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
+  return apiRequest<{ customers: AdminCustomer[]; pagination: Pagination }>(`/admin/customers${query.size ? `?${query}` : ""}`, { token });
+}
+
+export function getAdminCustomerWallet(token: string, userId: string) {
+  return apiRequest<{ wallet: Wallet }>(`/admin/customers/${encodeURIComponent(userId)}/wallet`, { token });
+}
+
+export function getAdminTransactions(token: string, params: { type?: Transaction["type"]; status?: Transaction["status"]; search?: string; page?: number; limit?: number } = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
+  return apiRequest<{ transactions: AdminTransaction[]; pagination: Pagination }>(`/wallet/admin/transactions${query.size ? `?${query}` : ""}`, { token });
 }
 
 export function getAdminOverview(token: string) {

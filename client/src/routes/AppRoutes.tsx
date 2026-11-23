@@ -8,9 +8,11 @@ import {
   BookingCheckoutPage, BookingDetailPage, MyBookingsPage, ProfilePage, StationDetailsPage,
   TransactionHistoryPage, WalletPage,
 } from "../pages/UserPages";
-import { AdminBookingsPage, AdminDashboardPage, AdminStationsPage } from "../pages/AdminPages";
+import { AdminBookingsPage, AdminStationsPage } from "../pages/AdminPages";
 import { NotificationHistoryPage } from "../pages/NotificationPages";
 import BookingCartCheckoutPage from "../pages/BookingCartCheckoutPage";
+import AdminLayout from "../components/layout/AdminLayout";
+import { AdminAvailabilityPage, AdminCustomersPage, AdminTransactionsPage, OwnerDashboardPage, WalkInBookingPage } from "../pages/AdminOperationsPages";
 
 function ProtectedArea({ admin = false }: { admin?: boolean }) {
   const { user, token, loading, sessionError, refreshProfile, logout } = useAuth();
@@ -45,9 +47,16 @@ export default function AppRoutes() {
         <Route path="/notifications" element={<NotificationHistoryPage />} />
       </Route>
       <Route element={<ProtectedArea admin />}>
-        <Route path="/admin" element={<AdminDashboardPage />} />
-        <Route path="/admin/stations" element={<AdminStationsPage />} />
-        <Route path="/admin/bookings" element={<AdminBookingsPage />} />
+        <Route element={<AdminLayout />}>
+          <Route path="/admin" element={<OwnerDashboardPage />} />
+          <Route path="/admin/stations" element={<AdminStationsPage />} />
+          <Route path="/admin/availability" element={<AdminAvailabilityPage />} />
+          <Route path="/admin/bookings" element={<AdminBookingsPage />} />
+          <Route path="/admin/walk-in" element={<WalkInBookingPage />} />
+          <Route path="/admin/customers" element={<AdminCustomersPage />} />
+          <Route path="/admin/transactions" element={<AdminTransactionsPage />} />
+          <Route path="/admin/notifications" element={<NotificationHistoryPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Route>

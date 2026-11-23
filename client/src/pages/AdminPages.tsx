@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { createStation, deactivateStation, formatMinor, getAdminBookings, getAdminOverview, getAdminStations, getErrorMessage, updateStation, updateStationStatus, type AdminOverview, type Booking, type Pagination, type Station } from "../lib/api";
 import { buttonPrimary, buttonSecondary, inputClass, LoadingState, Notice, PageHeading } from "../components/ui/Feedback";
@@ -40,10 +40,13 @@ const blankStation: StationForm = { name: "", code: "", type: "PC", description:
 
 export function AdminStationsPage() {
   const { token } = useAuth();
+  const [stationParams] = useSearchParams();
   const [stations, setStations] = useState<Station[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [type, setType] = useState<"" | Station["type"]>("");
+  const [status, setStatus] = useState<"" | Station["status"]>((stationParams.get("status") as Station["status"]) || "");
   const [form, setForm] = useState<StationForm>(blankStation);
   const [editing, setEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,11 +56,11 @@ export function AdminStationsPage() {
   async function load() {
     setLoading(true);
     if (!token) return;
-    try { const result = await getAdminStations(token, { search: search.trim() || undefined, page, limit: 20 }); setStations(result.stations); setPagination(result.pagination); setError(""); }
+    try { const result = await getAdminStations(token, { search: search.trim() || undefined, type: type || undefined, status: status || undefined, page, limit: 20 }); setStations(result.stations); setPagination(result.pagination); setError(""); }
     catch (e) { setError(getErrorMessage(e)); }
     finally { setLoading(false); }
   }
-  useEffect(() => { void load(); }, [token, search, page]);
+  useEffect(() => { void load(); }, [token, search, type, status, page]);
 
   function beginEdit(station: Station) {
     setEditing(station.id);
@@ -120,10 +123,12 @@ export function AdminStationsPage() {
       </form>
     </section>
 
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><label className="w-full max-w-sm text-xs font-bold text-[#AAB7C0]">Search all stations<input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} className={`${inputClass} mt-1`} placeholder="Search by name" /></label><span className="text-xs text-[#84919D]">{pagination.total} stations</span></div>
-    {loading ? <LoadingState label="Loading station inventory…" /> : stations.length ? <div className="mt-4 grid gap-4 lg:grid-cols-2">{stations.map((station) => <article key={station.id} className="rounded-2xl border border-[#164B54] bg-[#151A20] p-5">
-      <div className="flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-wide text-[#4DDCE9]">{station.code} · {station.type}</p><h3 className="mt-1 text-lg font-bold text-white">{station.name}</h3><p className="mt-1 text-sm text-[#A5B4BC]">{formatMinor(station.hourlyRateMinor)} / hour</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${station.status === "active" ? "bg-[#123C36] text-[#38E8BA]" : "bg-[#332A3C] text-[#C9A3E8]"}`}>{station.status}</span></div>
-      <div className="mt-5 flex flex-wrap gap-2"><button onClick={() => beginEdit(station)} className={buttonSecondary}>Edit</button><select value={station.status} disabled={busy} onChange={(e) => void changeStatus(station, e.target.value as Station["status"])} className="rounded-lg border border-[#303943] bg-[#0D1218] px-3 py-2 text-xs text-white"><option value="active">Active</option><option value="maintenance">Maintenance</option><option value="inactive">Inactive</option></select><button onClick={() => void deactivate(station)} disabled={busy || station.status === "inactive"} className="rounded-lg border border-rose-900 px-3 py-2 text-xs font-semibold text-rose-200 disabled:opacity-40">Deactivate</button></div>
+    <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="text-xs font-bold text-[#AAB7C0]">Search stations<input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} className={`${inputClass} mt-1`} placeholder="Search by name" /></label><label className="text-xs font-bold text-[#AAB7C0]">Type<select value={type} onChange={(e) => { setPage(1); setType(e.target.value as typeof type); }} className={`${inputClass} mt-1`}><option value="">All types</option><option value="PC">PC</option><option value="Console">Console</option><option value="VR">VR</option></select></label><label className="text-xs font-bold text-[#AAB7C0]">Status<select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value as typeof status); }} className={`${inputClass} mt-1`}><option value="">All statuses</option><option value="active">Active</option><option value="maintenance">Maintenance</option><option value="inactive">Inactive</option></select></label><span className="self-end pb-2 text-xs text-[#84919D]">{pagination.total} stations</span></div>
+    {loading ? <LoadingState label="Loading station inventory…" /> : stations.length ? <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">{stations.map((station) => <article key={station.id} className="min-w-0 rounded-2xl border border-[#164B54] bg-[#151A20] p-5">
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="break-words text-xs uppercase tracking-wide text-[#4DDCE9]">{station.code} · {station.type}</p><h3 className="mt-1 break-words text-lg font-bold text-white">{station.name}</h3><p className="mt-1 text-sm text-[#A5B4BC]">{formatMinor(station.hourlyRateMinor)} / hour</p></div><span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold capitalize ${station.status === "active" ? "bg-[#123C36] text-[#38E8BA]" : "bg-[#332A3C] text-[#C9A3E8]"}`}>{station.status}</span></div>
+      {station.description && <p className="mt-3 line-clamp-2 text-sm text-[#A5B4BC]">{station.description}</p>}
+      <details className="mt-3 rounded-lg border border-[#263640] bg-[#0D1218] p-3"><summary className="cursor-pointer text-xs font-semibold text-[#4DDCE9]">Station details and installed games</summary><dl className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(station.specifications || {}).map(([key, value]) => <div key={key}><dt className="text-[10px] capitalize text-[#84919D]">{key.replaceAll("_", " ")}</dt><dd className="break-words text-xs text-white">{String(value)}</dd></div>)}</dl><p className="mt-2 text-xs text-[#C5D0D8]">Games: {station.installedGames?.join(", ") || "No installed games listed"}</p></details>
+      <div className="mt-5 flex flex-wrap gap-2"><button onClick={() => beginEdit(station)} className={buttonSecondary}>Edit</button><Link to={`/admin/availability?stationId=${encodeURIComponent(station.id)}`} className={buttonSecondary}>View schedule</Link><select aria-label={`Set ${station.name} status`} value={station.status} disabled={busy} onChange={(e) => void changeStatus(station, e.target.value as Station["status"])} className="rounded-lg border border-[#303943] bg-[#0D1218] px-3 py-2 text-xs text-white"><option value="active">Active</option><option value="maintenance">Maintenance</option><option value="inactive">Inactive</option></select><button onClick={() => void deactivate(station)} disabled={busy || station.status === "inactive"} className="rounded-lg border border-rose-900 px-3 py-2 text-xs font-semibold text-rose-200 disabled:opacity-40">Deactivate</button></div>
     </article>)}</div> : <div className="mt-4 rounded-xl border border-[#263640] bg-[#0D1218] p-6 text-sm text-[#84919D]">No stations match the current search. Create a station or adjust the search.</div>}
     {pagination.totalPages > 1 && <div className="mt-5 flex justify-between text-xs text-[#A5B4BC]"><span>Page {page} of {pagination.totalPages}</span><div className="flex gap-2"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded border border-[#303943] px-3 py-2 disabled:opacity-40">Previous</button><button disabled={page >= pagination.totalPages} onClick={() => setPage((value) => value + 1)} className="rounded border border-[#303943] px-3 py-2 disabled:opacity-40">Next</button></div></div>}
   </AdminContent>;
@@ -140,29 +145,39 @@ export function AdminBookingsPage() {
   const [items, setItems] = useState<Booking[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState("");
+  const [queryParams] = useSearchParams();
+  const [status, setStatus] = useState(queryParams.get("status") || "");
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [search, setSearch] = useState(queryParams.get("search") || "");
   const [stationId, setStationId] = useState("");
+  const [stations, setStations] = useState<Station[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   useEffect(() => {
     if (!token) return;
+    getAdminStations(token, { limit: 100 }).then(({ stations: result }) => setStations(result)).catch(() => {});
+  }, [token]);
+  useEffect(() => {
+    if (!token) return;
     let active = true;
     setLoading(true);
-    getAdminBookings(token, { status: status || undefined, stationId: stationId.trim() || undefined, from: localDateTimeToISO(from), to: localDateTimeToISO(to), page, limit: 20 })
+    getAdminBookings(token, { status: status || undefined, paymentStatus: paymentStatus || undefined, search: search.trim() || undefined, stationId: stationId || undefined, from: localDateTimeToISO(from), to: localDateTimeToISO(to), page, limit: 20 })
       .then((result) => { if (active) { setItems(result.bookings); setPagination(result.pagination); setError(""); } })
       .catch((e) => { if (active) setError(getErrorMessage(e)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [token, status, stationId, from, to, page]);
+  }, [token, status, paymentStatus, search, stationId, from, to, page]);
 
   return <AdminContent>
     <PageHeading eyebrow="LOUNGE OPERATIONS" title="Booking management" description="Filter the booking ledger and review customer sessions. Details and eligible cancellations use the existing booking APIs." />
     {error && <div className="mb-4"><Notice>{error}</Notice></div>}
-    <section className="mb-5 grid gap-3 rounded-2xl border border-[#164B54] bg-[#151A20] p-4 sm:grid-cols-2 lg:grid-cols-4">
+    <section className="mb-5 grid min-w-0 gap-3 rounded-2xl border border-[#164B54] bg-[#151A20] p-4 sm:grid-cols-2 xl:grid-cols-3">
+      <label className="text-xs font-bold text-[#AAB7C0]">Search booking or customer<input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} className={`${inputClass} mt-1`} placeholder="Booking ID, name, email, phone" /></label>
       <label className="text-xs font-bold text-[#AAB7C0]">Booking status<select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} className={`${inputClass} mt-1`}><option value="">All statuses</option>{["pending", "confirmed", "cancelled", "completed", "no_show"].map((value) => <option key={value} value={value}>{value.replace("_", " ")}</option>)}</select></label>
-      <label className="text-xs font-bold text-[#AAB7C0]">Station ObjectId<input value={stationId} onChange={(e) => { setPage(1); setStationId(e.target.value); }} className={`${inputClass} mt-1`} placeholder="Optional station ID" /></label>
+      <label className="text-xs font-bold text-[#AAB7C0]">Payment status<select value={paymentStatus} onChange={(e) => { setPage(1); setPaymentStatus(e.target.value); }} className={`${inputClass} mt-1`}><option value="">All payment states</option>{["unpaid", "paid", "refunded", "not_required"].map((value) => <option key={value} value={value}>{value.replace("_", " ")}</option>)}</select></label>
+      <label className="text-xs font-bold text-[#AAB7C0]">Station<select value={stationId} onChange={(e) => { setPage(1); setStationId(e.target.value); }} className={`${inputClass} mt-1`}><option value="">All stations</option>{stations.map((station) => <option key={station.id} value={station.id}>{station.name} · {station.code}</option>)}</select></label>
       <label className="text-xs font-bold text-[#AAB7C0]">From (Asia/Kolkata)<input type="datetime-local" value={from} onChange={(e) => { setPage(1); setFrom(e.target.value); }} className={`${inputClass} mt-1`} /></label>
       <label className="text-xs font-bold text-[#AAB7C0]">To (Asia/Kolkata)<input type="datetime-local" value={to} onChange={(e) => { setPage(1); setTo(e.target.value); }} className={`${inputClass} mt-1`} /></label>
     </section>

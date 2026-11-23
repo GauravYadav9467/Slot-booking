@@ -64,6 +64,33 @@ function validateTransactionList(req, res, next) {
   return next();
 }
 
+function validateAdminTransactionList(req, res, next) {
+  const errors = [];
+  for (const key of Object.keys(req.query)) if (!["type", "status", "search", "page", "limit"].includes(key)) errors.push(`Query parameter '${key}' is not supported.`);
+  const { type, status } = req.query;
+  if (type !== undefined && (typeof type !== "string" || !transactionTypes.includes(type))) errors.push("type is not a valid transaction type.");
+  if (status !== undefined && (typeof status !== "string" || !transactionStatuses.includes(status))) errors.push("status is not a valid transaction status.");
+  let search;
+  if (req.query.search !== undefined) {
+    if (typeof req.query.search !== "string" || !req.query.search.trim() || req.query.search.trim().length > 100) errors.push("search must be between 1 and 100 characters.");
+    else search = req.query.search.trim();
+  }
+  const parse = (key, fallback, max) => {
+    const raw = req.query[key];
+    if (raw === undefined) return fallback;
+    if (typeof raw !== "string" || !/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(Number(raw)) || Number(raw) > max) {
+      errors.push(`${key} must be a positive integer no greater than ${max}.`);
+      return fallback;
+    }
+    return Number(raw);
+  };
+  const page = parse("page", 1, 1000000);
+  const limit = parse("limit", 20, 100);
+  if (errors.length) return fail(next, errors);
+  req.adminTransactionQuery = { type, status, search, page, limit };
+  return next();
+}
+
 function validateAdjustment(req, res, next) {
   if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
     return fail(next, "A JSON object is required.");
@@ -80,4 +107,4 @@ function validateAdjustment(req, res, next) {
   return next();
 }
 
-module.exports = { validateIdempotencyKey, validateWalletQuery, validateTopUp, validateTransactionList, validateAdjustment };
+module.exports = { validateIdempotencyKey, validateWalletQuery, validateTopUp, validateTransactionList, validateAdminTransactionList, validateAdjustment };

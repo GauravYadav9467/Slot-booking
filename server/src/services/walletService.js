@@ -147,6 +147,38 @@ async function getTransactions(userId, { type, status, page, limit }) {
   };
 }
 
+async function getAdminTransactions({ type, status, search, page, limit }) {
+  const filter = {};
+  if (type) filter.type = type;
+  if (status) filter.status = status;
+  if (search) {
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const customers = await User.find({
+      role: "user",
+      $or: [
+        { name: { $regex: escaped, $options: "i" } },
+        { email: { $regex: escaped, $options: "i" } },
+        { phone: { $regex: escaped, $options: "i" } },
+      ],
+    }).select("_id").limit(250).lean();
+    const matching = customers.map((customer) => customer._id);
+    const alternatives = [{ userId: { $in: matching } }];
+    if (mongoose.isObjectIdOrHexString(search)) alternatives.push({ bookingId: search });
+    filter.$or = alternatives;
+  }
+  const [items, total] = await Promise.all([
+    Transaction.find(filter).populate("userId", "name email phone").sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    Transaction.countDocuments(filter),
+  ]);
+  return {
+    transactions: items.map((item) => ({
+      ...safeTransaction(item),
+      customer: item.userId ? { id: item.userId._id.toString(), name: item.userId.name, email: item.userId.email, phone: item.userId.phone || "" } : null,
+    })),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+}
+
 async function topUp(userId, amountMinor, idempotencyKey) {
   const { min, max } = topUpLimits();
   if (amountMinor < min || amountMinor > max) {
@@ -418,7 +450,7 @@ async function adjustWallet({ userId, direction, amountMinor, reason }, idempote
       assertReplayMatches(prior, { userId, type: "adjustment", amountMinor, direction, description: reason });
       return { transaction: safeTransaction(prior), wallet: safeWallet(await requireActiveWallet(userId, session)), idempotent: true };
     }
-    if (!(await User.exists({ _id: userId }).session(session))) throw createError("User not found.", 404);
+    if (!(await User.exists({ _id: userId, role: "user" }).session(session))) throw createError("Registered customer not found.", 404);
     const wallet = await requireActiveWallet(userId, session);
     const condition = direction === "credit"
       ? { balanceMinor: { $lte: MAX_MINOR - amountMinor } }
@@ -448,6 +480,7 @@ async function adjustWallet({ userId, direction, amountMinor, reason }, idempote
 module.exports = {
   getWallet,
   getTransactions,
+  getAdminTransactions,
   topUp,
   payBooking,
   cancelBooking,

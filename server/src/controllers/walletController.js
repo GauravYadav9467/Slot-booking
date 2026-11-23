@@ -10,6 +10,11 @@ async function getTransactions(req, res) {
   res.status(200).json({ status: "success", data: result });
 }
 
+async function getAdminTransactions(req, res) {
+  const result = await walletService.getAdminTransactions(req.adminTransactionQuery);
+  res.status(200).json({ status: "success", data: result });
+}
+
 async function topUp(req, res) {
   const result = await walletService.topUp(req.auth.userId, req.topUpAmountMinor, req.idempotencyKey);
   res.status(result.idempotent ? 200 : 201).json({ status: "success", data: result });
@@ -20,4 +25,4 @@ async function adjustWallet(req, res) {
   res.status(result.idempotent ? 200 : 201).json({ status: "success", data: result });
 }
 
-module.exports = { getWallet, getTransactions, topUp, adjustWallet };
+module.exports = { getWallet, getTransactions, getAdminTransactions, topUp, adjustWallet };

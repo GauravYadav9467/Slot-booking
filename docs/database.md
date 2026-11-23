@@ -94,6 +94,8 @@ Indexes: unique `reference` for idempotency; `{ userId, createdAt }` for transac
 
 Indexes support per-user chronological and read-state queries. A sparse unique index on `eventRef` allows legacy documents without this field while preventing duplicate newly generated events.
 
+Walk-in creation reuses the existing `Booking` model and does not add a guest/customer schema or payment record. The associated customer must be an active `User` with role `user`; the booking stores the calculated price snapshot and starts with `paymentStatus: unpaid`. A `booking_pending` user notification records the walk-in creation in the same booking transaction. No wallet balance or transaction ledger entry is written for this operation.
+
 ## StationReservationLock (supporting model)
 
 This seventh, internal model serializes concurrent booking API writes per station. Booking creation now also uses a replica-set transaction to commit the booking and its administrator notification together. Financial transactions separately protect wallet, ledger, booking payment/refund, and related notification writes.

@@ -131,6 +131,16 @@ To start a Windows MongoDB service, open **Services**, locate the installed Mong
 
 ## Production preparation
 
+## Owner control panel demonstration
+
+Sign in with an administrator account created through the local demo seed or provisioned by an administrator. Open `/admin` for the overview. The owner sidebar links to station inventory, the daily slot schedule, booking management, walk-in booking, customer and wallet review, transaction history and notifications. All owner APIs require the admin role; public station discovery still returns active stations only.
+
+To create a walk-in reservation, choose an active existing customer, active station, date and time. The page shows the server's availability and price quote, then the API verifies both again at submission. A successful walk-in is pending and unpaid. No wallet funds are debited and no cash is recorded by the system; treat payment collection outside the application's ledger accordingly. A displayed free slot is not a reservation until the create request succeeds.
+
+Run the backend integration suite with `npm test` in `server/`; owner schedule and walk-in cases are in `tests/admin-control.integration.test.js`. These booking operations require the configured writable replica set `rs0`.
+
+## Production preparation
+
 The repository does not include a deployment workflow or hosting configuration. For a future deployment, build the client with `npm ci` and `npm run build` in `client/`, then serve the generated `client/dist` through a static host. On a Node.js host, install backend dependencies with `npm ci` in `server/` and run `npm start`. Configure production environment variables through the hosting provider's secret manager: a TLS-enabled MongoDB replica-set URI, a unique JWT secret of at least 32 bytes, `JWT_EXPIRES_IN`, `PORT`, and `CLIENT_ORIGIN` set to the exact HTTPS client origin(s). Set `NODE_ENV=production`; demo seeding is disabled in that mode. Never use demo account credentials in production.
 
 Keep MongoDB transactions available on the production database because booking creation and wallet operations require them. Restrict database network access to the API host, use least-privilege database credentials, terminate HTTPS at the host or reverse proxy, and retain Helmet and the configured CORS policy. Configure regular encrypted database backups, restrict backup access, and periodically test restoration in a separate environment. The login/registration limiter currently stores counters in process memory; a multi-instance deployment should configure a shared rate-limit store. No deployment, external service change, backup or restore has been performed as part of this project milestone.

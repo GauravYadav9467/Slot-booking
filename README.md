@@ -10,8 +10,11 @@ NEXUS ARENA is an academic gaming lounge project for station discovery, user aut
 - MongoDB-backed reservation leases to coordinate concurrent booking API requests.
 - Transaction-backed simulated wallet top-ups, booking charges, cancellation refunds, transaction history, and admin adjustments.
 - User-scoped in-app notifications for booking and wallet events, plus an operational admin dashboard.
+- Responsive owner control panel with dashboard metrics, station schedule, registered-customer lookup, walk-in booking, and transaction review.
 
 Top-ups are a local simulation and do not charge a payment method or represent funds received. Booking creation and wallet/booking financial updates use MongoDB replica-set transactions so their notifications stay atomic with the related records. Notifications are in-app only; email, SMS, WhatsApp and payment-provider delivery are not implemented. Eligible future booking cancellations refund successful wallet charges; unpaid cancellations do not issue refunds. Admins can list and manage stations across active, maintenance, and inactive statuses; public station discovery remains active-only.
+
+The owner control panel is available under `/admin`. Admin walk-in bookings use an existing active customer and the same server-side availability, pricing, station reservation lease, and MongoDB transaction as customer bookings. They are created as pending and unpaid; they do not debit a wallet or record cash received. See [the API reference](docs/api.md) for owner endpoints.
 
 ## Technology stack
 
@@ -80,4 +83,4 @@ The seed command can also create local demo accounts. Set `DEMO_ADMIN_NAME`, `DE
 
 ## Final verification
 
-The current backend integration suite reports 35 passing tests against the configured writable `rs0` replica set. Model index verification passes for all seven active schemas, JavaScript syntax checks pass, the frontend TypeScript production build passes, and both dependency audits report no vulnerabilities. Lint exits successfully with existing React warnings, and the Vite config reports a non-blocking `__dirname` compatibility warning. Browser-based manual testing was not performed because no browser automation tool is available in this environment. Deployment has not been performed.
+The backend integration suite covers authentication, bookings and concurrency, station administration, wallet integrity, notifications, owner operations, and walk-in bookings. Results from the current owner-control-panel verification are reported with the milestone change. Browser testing and deployment are not claimed unless separately performed.

@@ -85,6 +85,8 @@ Creation returns HTTP 201 with the station record. Public listing returns `{ "st
 | GET | `/bookings/:id` | Bearer token | Owner or admin |
 | PATCH | `/bookings/:id/cancel` | Bearer token | Owner or admin |
 | GET | `/bookings/admin` | Bearer token | Admin |
+| GET | `/bookings/admin/availability` | Bearer token | Admin daily schedule |
+| POST | `/bookings/admin/walk-in` | Bearer token | Admin walk-in booking |
 
 Availability query parameters: `stationId`, `startAt`, `endAt`. Timestamps must be ISO 8601 with an explicit offset, for example:
 
@@ -162,6 +164,7 @@ Pay for an eligible booking with `POST /bookings/:id/pay`. The request has no bo
 | GET | `/wallet/transactions` | Bearer token | Current user's history only |
 | POST | `/wallet/top-up` | Bearer token + `Idempotency-Key` | Current user; simulated only |
 | POST | `/wallet/admin/adjustments` | Bearer token + `Idempotency-Key` | Admin |
+| GET | `/wallet/admin/transactions` | Bearer token | Admin ledger search |
 
 `GET /wallet` accepts no query parameters and returns `{ "wallet": { "id", "balanceMinor", "currency", "status", "updatedAt" } }`. The user ID comes from the authenticated token.
 
@@ -211,6 +214,37 @@ Generated user types include `booking_confirmed`, `payment_success`, `booking_ca
 Booking creation and its admin notification share a MongoDB transaction. Top-up, payment, cancellation and refund notifications are inserted inside the same financial transaction as the associated wallet/booking changes. If notification persistence fails, that transaction rolls back; the API does not silently accept an unnotified financial operation. Unique per-recipient event references prevent duplicate notification records when an idempotent financial operation is retried.
 
 `GET /admin/overview` returns database-derived counts for active, maintenance and inactive stations; booking totals by status; five most recently created bookings; and up to five recent operational notifications for the current admin account.
+
+## Owner control panel and walk-in bookings
+
+All endpoints in this section require an active admin bearer token. Normal users receive 403, and requests without a valid token receive 401. User/customer responses omit password hashes and credentials.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/admin/overview` | Station and booking counts, recent bookings and operational notifications |
+| GET | `/bookings/admin/availability?date=YYYY-MM-DD&durationMinutes=60` | All-station day schedule with each half-hour start marked available, booked, in maintenance/inactive, in the past, or processing; booked slots include safe booking/customer summary |
+| POST | `/bookings/admin/walk-in` | Create an unpaid booking for an existing active registered user |
+| GET | `/admin/customers?search=...&status=active&page=1&limit=20` | Search safe registered-customer fields; status is `active` or `blocked` |
+| GET | `/admin/customers/:id/wallet` | Safe wallet balance/status summary for a registered customer |
+| GET | `/wallet/admin/transactions?type=...&status=...&search=...&page=1&limit=20` | Search/filter the admin ledger |
+| GET | `/stations/admin` | All station statuses; public `GET /stations` remains active-only |
+
+The schedule date is limited to today through the next two Asia/Kolkata calendar days. `durationMinutes` follows the configured booking duration minimum, maximum and increment. Schedule availability is informational and may change before a booking is submitted; walk-in creation performs fresh server-side checks under the normal station reservation lease.
+
+Walk-in request body:
+
+```json
+{
+  "userId": "665f00000000000000000002",
+  "stationId": "665f00000000000000000001",
+  "startAt": "2027-01-10T18:00:00+05:30",
+  "endAt": "2027-01-10T19:00:00+05:30"
+}
+```
+
+The server requires an existing active customer with role `user`, an active station, a valid future interval, and no conflicting booking. It derives duration and integer-paise price from the timestamps and station rate; client price, status and payment fields are rejected. Successful creation returns HTTP 201 with a pending, unpaid booking. It shares the normal booking transaction, reservation lock and notification write. It does not deduct wallet funds, record a cash payment, or claim that payment was received. Administrators can later inspect the booking in the existing admin booking list. This milestone does not add guest registration or cash collection recording.
+
+The wallet transaction endpoint reuses existing admin adjustment/ledger rules; it does not bypass idempotency or the MongoDB transaction requirements.
 
 ## Error responses
 

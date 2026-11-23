@@ -69,6 +69,12 @@ Notification routes require authentication and derive the recipient from the ver
 
 The admin overview uses database aggregations for station and booking status counts and returns recent bookings plus the current administrator's operational notifications. The navbar refreshes unread counts on route changes, window focus, panel open, and explicit refresh events after account actions. No polling or external notification delivery is used.
 
+## Owner operations and walk-in bookings
+
+All owner pages are nested under the authenticated `AdminLayout`; the router requires an active admin. Administrative APIs repeat authentication and role checks server-side. The owner calendar uses an admin-only endpoint that reads station inventory, existing bookings and active reservation leases. Customer search returns only registered `user` accounts and safe profile fields. Wallet review exposes a balance summary; transaction review uses the existing ledger service.
+
+Walk-in booking is not a separate booking or payment pipeline. The admin submits an existing active customer, station and time window; the booking service validates the customer and uses the same station lease, overlap/status checks, server price snapshot, MongoDB transaction and admin notification as a customer booking. Its payment status remains unpaid. The service does not debit a wallet or imply that cash or other funds were collected. No guest customer records or cash payment endpoint are introduced.
+
 ## Important technical decisions
 
 - Booking times require an explicit ISO 8601 offset and are stored as UTC `Date` values. Client display defaults to `Asia/Kolkata`.

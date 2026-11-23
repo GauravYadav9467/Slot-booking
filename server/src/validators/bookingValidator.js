@@ -125,6 +125,50 @@ function validateStationId(value) {
   return typeof value === "string" && mongoose.isObjectIdOrHexString(value);
 }
 
+function validateAdminAvailability(req, res, next) {
+  const { date, durationMinutes: rawDuration } = req.query;
+  const errors = [];
+  for (const key of Object.keys(req.query)) {
+    if (!["date", "durationMinutes"].includes(key)) errors.push(`Query parameter '${key}' is not supported.`);
+  }
+  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    errors.push("date must use YYYY-MM-DD format.");
+  }
+  let day;
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const parsed = new Date(`${date}T00:00:00+05:30`);
+    if (!Number.isFinite(parsed.getTime()) || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(parsed) !== date) {
+      errors.push("date must be a valid Asia/Kolkata calendar date.");
+    } else {
+      const today = kolkataCalendarDay(new Date());
+      day = kolkataCalendarDay(parsed);
+      if (day < today || day > today + 2) errors.push("The schedule is limited to today and the next two calendar days in Asia/Kolkata.");
+    }
+  }
+  const durationMinutes = rawDuration === undefined ? 60 : Number(rawDuration);
+  const rules = durationRules();
+  if (typeof rawDuration === "string" && !/^\d+$/.test(rawDuration)) errors.push("durationMinutes must be a positive integer.");
+  if (!Number.isSafeInteger(durationMinutes) || durationMinutes < rules.min || durationMinutes > rules.max || durationMinutes % rules.step !== 0) {
+    errors.push(`durationMinutes must be ${rules.min} to ${rules.max} in increments of ${rules.step}.`);
+  }
+  if (errors.length) return fail(next, errors);
+  req.adminAvailabilityQuery = { date, durationMinutes };
+  return next();
+}
+
+function validateWalkInBooking(req, res, next) {
+  if (!isPlainObject(req.body)) return fail(next, "A JSON object is required.");
+  const errors = [];
+  const allowed = ["userId", "stationId", "startAt", "endAt"];
+  for (const key of Object.keys(req.body)) if (!allowed.includes(key)) errors.push(`Field '${key}' cannot be set by the client.`);
+  if (!validateStationId(req.body.userId)) errors.push("userId must be a valid MongoDB ObjectId.");
+  if (!validateStationId(req.body.stationId)) errors.push("stationId must be a valid MongoDB ObjectId.");
+  const timeWindow = parseTimeWindow(req.body.startAt, req.body.endAt, errors);
+  if (errors.length) return fail(next, errors);
+  req.walkInInput = { userId: req.body.userId, stationId: req.body.stationId, ...timeWindow };
+  return next();
+}
+
 function validateAvailability(req, res, next) {
   const query = req.query;
   const errors = [];
@@ -201,7 +245,7 @@ function validateMyBookings(req, res, next) {
 function validateAdminBookings(req, res, next) {
   const query = req.query;
   const errors = [];
-  const allowed = ["status", "stationId", "from", "to", "page", "limit"];
+  const allowed = ["status", "paymentStatus", "stationId", "from", "to", "search", "page", "limit"];
   for (const key of Object.keys(query)) {
     if (!allowed.includes(key)) errors.push(`Query parameter '${key}' is not supported.`);
   }
@@ -210,6 +254,16 @@ function validateAdminBookings(req, res, next) {
   if (query.status !== undefined) {
     status = typeof query.status === "string" ? query.status.toLowerCase() : "";
     if (!bookingStatuses.includes(status)) errors.push("status is not a valid booking status.");
+  }
+  let paymentStatus;
+  if (query.paymentStatus !== undefined) {
+    paymentStatus = typeof query.paymentStatus === "string" ? query.paymentStatus.toLowerCase() : "";
+    if (!["unpaid", "paid", "refunded", "not_required"].includes(paymentStatus)) errors.push("paymentStatus is not a valid payment status.");
+  }
+  let search;
+  if (query.search !== undefined) {
+    if (typeof query.search !== "string" || query.search.trim().length < 1 || query.search.trim().length > 100) errors.push("search must be between 1 and 100 characters.");
+    else search = query.search.trim();
   }
   let stationId;
   if (query.stationId !== undefined) {
@@ -225,7 +279,7 @@ function validateAdminBookings(req, res, next) {
 
   const pagination = parsePagination(query, errors);
   if (errors.length) return fail(next, errors);
-  req.adminBookingQuery = { ...pagination, status, stationId, from, to };
+  req.adminBookingQuery = { ...pagination, status, paymentStatus, stationId, from, to, search };
   return next();
 }
 
@@ -259,6 +313,8 @@ function validateBookingPayment(req, res, next) {
 
 module.exports = {
   validateAvailability,
+  validateAdminAvailability,
+  validateWalkInBooking,
   validateCreateBooking,
   validateBookingId,
   validateMyBookings,
